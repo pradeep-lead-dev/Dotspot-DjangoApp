@@ -1,0 +1,5 @@
+env/
+ReactApp/
+__pycache__/
+migrations/
+models/
