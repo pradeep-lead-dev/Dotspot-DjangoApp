@@ -87,13 +87,18 @@ DATABASES = {
     }
 }
 
-CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_ALL_ORIGINS = False  # Disable wildcard
 
-CORS_ALLOWED_ORIGINS = ["*"]
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:5173",  # Example for local dev  # Replace with your actual domain
+]
 
-ALLOWED_HOSTS = ["*"]
+ALLOWED_HOSTS = [ "*" ]  # This can remain as is
 
-CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOW_CREDENTIALS = True  # Keep this as True if credentials are needed
+
+
+
 
 # Password validation
 # https://docs.djangoproject.com/en/5.1/ref/settings/#auth-password-validators
