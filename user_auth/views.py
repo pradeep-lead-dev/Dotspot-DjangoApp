@@ -98,7 +98,8 @@ def verify_jwt_token(token):
 @api_view(['GET'])
 def verify_token_route(req):
     try:
-        token = req.data.get('token',None)
+        token =str(req.headers.get('Authorization', None)).split(" ")[1]
+        
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=['HS256'])
         return Response({ "success" : True }, status=200)
     except jwt.ExpiredSignatureError:
