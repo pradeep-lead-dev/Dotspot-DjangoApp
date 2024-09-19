@@ -111,7 +111,7 @@ def verify_token_route(req):
 def check(func):
     @wraps(func)
     def wrapper(req, *args, **kwargs):
-        auth_header = req.headers.get('token', None)
+        auth_header = str(req.headers.get('Authorization', None)).split(" ")[1]
 
         if auth_header:
             try:
