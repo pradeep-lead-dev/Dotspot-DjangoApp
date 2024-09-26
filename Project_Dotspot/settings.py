@@ -89,10 +89,33 @@ DATABASES = {
 
 CORS_ALLOW_ALL_ORIGINS = True
 
-CORS_ALLOWED_ORIGINS = [ 'http://localhost:5173'  ]
-
+# CORS_ALLOWED_ORIGINS = [ 'http://localhost:5173' ]
+ALLOWED_HOSTS = ['*']
 CORS_ALLOW_CREDENTIALS = True
 
+
+CORS_ALLOW_METHODS = [
+    'GET',
+    'POST',
+    'PUT',
+    'PATCH',
+    'DELETE',
+    'OPTIONS',
+]
+
+CORS_ALLOW_HEADERS = [
+    'authorization',
+    'content-type',
+    'x-requested-with',
+    'accept',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-frame-options',
+]
+CORS_ALLOWED_ORIGIN_REGEXES = [
+    r"^192",
+]
 # Password validation
 # https://docs.djangoproject.com/en/5.1/ref/settings/#auth-password-validators
 
@@ -146,3 +169,5 @@ CAMERA_URL = "HGSDAFKHSDHK.URL"
 JWT_SECRET_KEY = "Dotsp0t12345"
 
 SECRET_ENCRYPTION_KEY = 'YourGeneratedKeyHere'
+SENSITIVE_COLUMN = ['pw']
+NON_EDITABLE_COLUMN = 'name'
