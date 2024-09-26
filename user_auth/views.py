@@ -95,13 +95,23 @@ def verify_jwt_token(token):
     except jwt.InvalidTokenError:
         return Response({'error': 'Authorization Failed' , "success" : False}, status=401)  # Invalid token
     
-
+@api_view(['GET'])
+def verify_token_route(req):
+    try:
+        token =str(req.headers.get('Authorization', None)).split(" ")[1]
+        
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=['HS256'])
+        return Response({ "success" : True }, status=200)
+    except jwt.ExpiredSignatureError:
+        return Response({'error': 'Token exipired' , "success" : False }, status=400)  # Token has expired
+    except jwt.InvalidTokenError:
+        return Response({'error': 'Authorization Failed' , "success" : False}, status=401)  # Invalid token
 
 # Middleware (decorator) to check token
 def check(func):
     @wraps(func)
     def wrapper(req, *args, **kwargs):
-        auth_header = req.headers.get('token', None)
+        auth_header = str(req.headers.get('Authorization', None)).split(" ")[1]
 
         if auth_header:
             try:
