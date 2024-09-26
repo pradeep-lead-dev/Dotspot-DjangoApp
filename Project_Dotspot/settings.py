@@ -37,7 +37,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    # 'dashboard',
+    'dashboard',
     'corsheaders',
     'user_auth',
     'rest_framework',
@@ -186,5 +186,5 @@ JWT_SECRET_KEY = "Dotsp0t12345"
 
 SECRET_ENCRYPTION_KEY = 'YourGeneratedKeyHere'
 SENSITIVE_COLUMN = ['pw']
-NON_EDITABLE_COLUMN = 'name'
+NON_EDITABLE_COLUMN = ['name',"_id"]
 DATABASE_NAME = "dotspot"

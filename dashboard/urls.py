@@ -5,5 +5,6 @@ from .views import *
 urlpatterns = [
     path('', HomeView.as_view(),name="home"),
     path('/video/<str:camera_no>/', VideoFeed.as_view(),name="video"),
-    
+        # path('/check', ),
+
     ]

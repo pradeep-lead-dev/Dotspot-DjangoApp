@@ -10,7 +10,7 @@ https://docs.djangoproject.com/en/5.1/howto/deployment/wsgi/
 import os , threading
 
 from django.core.wsgi import get_wsgi_application
-# from dashboard.views import  start_model_processing
+from dashboard.views import  start_model_processing
 
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'Project_Dotspot.settings')
 
@@ -28,3 +28,4 @@ videopath =  os.path.join(os.path.dirname(__file__), 'model/orange1.mp4')
 # processing_thread = threading.Thread(target=startmodel, args=(camera_urls,), daemon=True)
 # processing_thread = threading.Thread(target=start_model_processing, daemon=True)
 # processing_thread.start()
+start_model_processing()

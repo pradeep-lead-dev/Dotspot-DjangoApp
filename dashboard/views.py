@@ -16,9 +16,9 @@ from django.conf import settings
 
 
 
-model_path = os.path.join(os.path.dirname(__file__), 'model/demo.pt')
-videopath = os.path.join(os.path.dirname(__file__), './model/orange1.mp4')
-videopath1 = os.path.join(os.path.dirname(__file__), './model/sample1.mp4')
+model_path = os.path.join(os.path.dirname(__file__), 'models/demo.pt')
+videopath = os.path.join(os.path.dirname(__file__), './model/orange_10s.mp4')
+# videopath1 = os.path.join(os.path.dirname(__file__), './model/sample1.mp4')
 database_name = settings.DATABASE_NAME
 
 
@@ -26,7 +26,7 @@ client = MongoClient("mongodb+srv://dotspot:D0ts1t012345!@dotspot.el4d0.mongodb.
 db = client[database_name] 
 
 db = client['dotspot'] 
-
+collection = db['records']
 
 class HomeView(APIView):
     def get(self, request):
@@ -38,24 +38,11 @@ class HomeView(APIView):
 
 
 
-
-
 # -------------------------  functionality section -------------------------------------
 
 
 
-
-
-
-
-
-# Global dictionaries to manage camera streams
-
-# -------------------------  functionality section -------------------------------------
-
-
-
-global camera_update_data, last_entry_time, start_time , processing , camera_urls
+global camera_update_data, last_entry_time, start_time , processing , camera_urls , cameradetails
 frame_queues = {}
 processing_flags = {}
 processing_threads = {}
@@ -65,11 +52,12 @@ start_time = {}
 last_entry_time = {}
 global counters
 counters = {}
+cameradetails = {}
 processing = False
 model_path = './models/demo.pt'
 
 model_path = 'models/demo.pt'
-camera_urls = ['./samplevideos/orange_10s.mp4']
+camera_urls = ['models/orange_10s.mp4']
 # camera_urls = ['./samplevideos/orange_10s.mp4', './samplevideos/sample1.mp4', 'rtsp://admin:Admin@123@115.244.221.74:2025/H.264']
 
 
@@ -102,35 +90,33 @@ camera_urls = ['./samplevideos/orange_10s.mp4']
 #     db.create_all()
 
 global timeperiod_for_db_storage, camera_details
-timeperiod_for_db_storage = 30
+timeperiod_for_db_storage = {}
 
 
 def get_camera_details():
     global timeperiod_for_db_storage , camera_urls
     collection = db['cameradetails']
     data = list(collection.find({}))
-    for camera in get_camera_details :
-        camera_urls.append(data)
+    for camera in data :
+        c_url = camera.get('cameraUrl')
+        if c_url and c_url not in camera_urls:
+            camera_urls.append(c_url)
+            timeperiod_for_db_storage[c_url] = camera.get('bufferTime',15)
+            cameradetails[c_url] = camera
+        print(c_url , "--->",len(camera_urls))
     return [timeperiod_for_db_storage , camera ]
+
+
+
 get_camera_details()
 
 
 
-print("----------------------------------------------" , timeperiod_for_db_storage)
+print("----------------------------------------------" ,camera_urls)
 
 
 
 
-@app.route('/changebuffer', methods=['get' ,'put'])
-def change_buffer ():
-    global timeperiod_for_db_storage ,  camera_urls
-    
-
-    return jsonify ({"time_buffer" : time_buffer ,  "camera_urls" : camera }) ,200
-
-
-
-# -------------------------  functionality section -------------------------------------
 
 def initialize_video_capture(url):
     cap = cv2.VideoCapture(url, cv2.CAP_FFMPEG)
@@ -196,59 +182,33 @@ def create_new_item_from_updates(camera_url):
     )
 
     # Proceed if 10 seconds have passed and total count is not zero
-    if (current_time - last_entry_time[camera_url]) >= timedelta(minutes = timeperiod_for_db_storage ) and total_count != 0:
+    if (current_time - last_entry_time[camera_url]) >= timedelta(minutes = (timeperiod_for_db_storage.get(camera_url) ) ) and total_count != 0:
         print(f"\nTotal count for {camera_url}: {total_count}")
 
-        with app.app_context():
-            # Check and add new columns dynamically if needed
-            inspector = inspect(db.engine)
-            table_columns = [col['name'] for col in inspector.get_columns('report')]  # Get existing column names
-
-            # Dynamically add new columns for counts that do not exist
-            for key, value in update_data.items():
-                if key.endswith('_count'):  # Process only the count fields
-                    # Replace hyphen with underscore to make column names safe for SQL
-                    safe_key = key.replace('-', '_').replace('1.5l', '1500ml')
-
-                    if safe_key not in table_columns:  # If column doesn't exist, add it
-                        alter_query = text(f'ALTER TABLE report ADD COLUMN {safe_key} INTEGER DEFAULT 0')
-                        db.session.execute(alter_query)
-                        db.session.commit()
-                        print(f"Added new column: {safe_key}")
+       
+        duration = int((last_entry_time[camera_url] - start_time[camera_url]).total_seconds())
+        
+        data_to_push = {"startTime" : start_time[camera_url], "endTime" : last_entry_time[camera_url],"Total_count":total_count,"duration" : duration}
+        # Dynamically add new columns for counts that do not exist
+        for key, value in update_data.items():
+            data_to_push[key] = value
 
             # Create a new report
-            duration = int((last_entry_time[camera_url] - start_time[camera_url]).total_seconds())
-            new_report = Report(
-                start_time=start_time[camera_url],
-                total_count=total_count,
-                conveyor=camera_urls.index(camera_url),
-                last_updated=last_entry_time[camera_url],
-                end_time=last_entry_time[camera_url],
-                duration=duration
-            )
+            # new_report = Report(
+            #     start_time=start_time[camera_url],
+            #     total_count=total_count,
+            #     conveyor=camera_urls.index(camera_url),
+            #     last_updated=last_entry_time[camera_url],
+            #     end_time=last_entry_time[camera_url],
+            #     duration=duration
+            # )
 
             # Add and commit the new report to the database
-            db.session.add(new_report)
-            db.session.commit()
-            print(f"Created new report with ID: {new_report.id}")
+        new_report = collection.insert_one(data_to_push)
+        print(f"Created new report ")
 
-            # Dynamically update the count fields for the newly created report
-            for key, value in update_data.items():
-                if key.endswith('_count'):
-                    safe_key = key.replace('-', '_').replace('1.5l', '1500ml')
-                    # Update the specific column in the report
-                    update_query = text(f'UPDATE report SET {safe_key} = :value WHERE id = :report_id')
-                    db.session.execute(update_query, {'value': value, 'report_id': new_report.id})
-                    db.session.commit()
-
-            # Reinitialize the counter and reset data for the next update cycle
-            reinitialize_counter(camera_url)
-            camera_update_data[camera_url] = {key: 0 for key in update_data if key.endswith('_count')}
-            camera_update_data[camera_url]['total_count'] = 0
-            start_time[camera_url] = None
-            last_entry_time[camera_url] = None
-
-            return {'id': new_report.id, 'message': 'Report created successfully'}
+          
+        return {'message': 'Report created successfully'}
 
     return None
 
@@ -379,7 +339,7 @@ def start_model_processing():
 
 
 
-# ---------------------------------------------------
+# # ---------------------------------------------------
 
 def generate_frames(camera_url):
     """
@@ -389,7 +349,7 @@ def generate_frames(camera_url):
         try:
             # Get the latest frame from the queue for the specified camera URL
             latest_frame = frame_queues[camera_url].get(timeout=1)
-        except queue.Empty:
+        except Queue.Empty:
             continue  # Skip if no frame is available
 
         # Encode the frame as JPEG
@@ -422,4 +382,4 @@ class VideoFeed(APIView):
         )
 
 
-# Route this in your urls.py as well
+# # Route this in your urls.py as well
