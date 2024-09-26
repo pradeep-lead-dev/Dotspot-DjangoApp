@@ -37,11 +37,12 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'dashboard',
+    # 'dashboard',
     'corsheaders',
     'user_auth',
     'rest_framework',
     'dynamic_crud',
+    "permissions",
 ]
 
 MIDDLEWARE = [
@@ -125,6 +126,12 @@ CORS_ALLOW_HEADERS = [
 CORS_ALLOWED_ORIGIN_REGEXES = [
     r"^192",
 ]
+
+CORS_ALLOW_HEADERS = [
+    'authorization',
+    'content-type',
+    'query-field',
+]
 # Password validation
 # https://docs.djangoproject.com/en/5.1/ref/settings/#auth-password-validators
 
@@ -180,3 +187,4 @@ JWT_SECRET_KEY = "Dotsp0t12345"
 SECRET_ENCRYPTION_KEY = 'YourGeneratedKeyHere'
 SENSITIVE_COLUMN = ['pw']
 NON_EDITABLE_COLUMN = 'name'
+DATABASE_NAME = "dotspot"

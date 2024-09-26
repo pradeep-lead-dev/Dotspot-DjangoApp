@@ -9,14 +9,15 @@ from django.conf import settings
 client = MongoClient("mongodb+srv://dotspot:D0ts1t012345!@dotspot.el4d0.mongodb.net/?retryWrites=true&w=majority&appName=Dotspot")
 restricted_fields  = settings.SENSITIVE_COLUMN
 non_editable_fields = settings.NON_EDITABLE_COLUMN
-
+database_name = settings.DATABASE_NAME
 # Connect to a specific database
-db = client['dotspot'] 
+db = client[database_name] 
 
 
 # Create your views here.
 @api_view(['GET', 'POST'])
 def getAll(req,collectionName):
+    print(req.build_absolute_uri())
     collection = db[collectionName]
     if req.method == 'GET':
         data = list(collection.find({}))
@@ -27,7 +28,7 @@ def getAll(req,collectionName):
             return Response({'success': True , 'data': data}, status=status.HTTP_200_OK)
         
         else :
-            return Response({"msg" : "No Data Found" , "data" : data , "success" : False})
+            return Response({"message" : "No Data Found" , "data" : data , "success" : False})
 
     
     if req.method == 'POST' :
@@ -35,18 +36,23 @@ def getAll(req,collectionName):
         try :
             data = collection.insert_one(dataToPost)
         
-            return Response({"msg" : f"{collectionName} created Successfully" ,"success" : True },status=201)
+            return Response({"message" : f"{collectionName} created Successfully" ,"success" : True },status=201)
         except Exception as e:
-            return Response({"msg" : "Request Unsuccessful" ,"success" : False },status=400)
+            return Response({"message" : "Request Unsuccessful" ,"success" : False },status=400)
 
 
 @api_view(['GET','PUT','DELETE'])
-def specificAction(request , collectionName , objId):
+def specificAction(request , collectionName , param):
     collection = db[collectionName]
-
+    query_field = request.headers.get('query-field', None)
+    print(request.headers)
     if request.method == 'GET':
         try:
-            form = collection.find_one({'_id': ObjectId(objId)})
+            if query_field:
+                form = collection.find_one({query_field : param})
+                print("use q ", query_field , param)
+            else:
+                form = collection.find_one({'_id': ObjectId(param)})
             if form:
                 form['_id'] = str(form['_id'])
                 filtered_fields = []
@@ -73,7 +79,11 @@ def specificAction(request , collectionName , objId):
             for field in updated_data:
                 if field not in non_editable_fields:
                     filtered_data[field] = updated_data[field]  
-            result = collection.update_one({'_id': ObjectId(objId)}, {'$set': filtered_data})
+
+            if query_field:
+                result = collection.update_one({query_field: param}, {'$set': filtered_data})
+            else:
+                result = collection.update_one({'_id': ObjectId(param)}, {'$set': filtered_data})
             if result.matched_count:
                 return Response({'success': True, 'message': f'{collectionName} updated'}, status=status.HTTP_200_OK)
             else:
@@ -83,7 +93,10 @@ def specificAction(request , collectionName , objId):
         
     if request.method == "DELETE":
         try:
-            result = collection.delete_one({'_id': ObjectId(objId)})
+            if query_field:
+                result = collection.delete_one({query_field: param})
+            else:
+                result = collection.delete_one({'_id': ObjectId(param)})
             if result.deleted_count:
                 return Response({'success': True , 'message': f'{collectionName} deleted'}, status=status.HTTP_200_OK)
             else:

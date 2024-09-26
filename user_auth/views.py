@@ -67,7 +67,7 @@ def login(req):
     password = req.data.get('password')
     print(email , password)
     if not password or not email :
-        return Response({"msg" : "required both email and password" , "success" : False},status= 400)
+        return Response({"message" : "required both email and password" , "success" : False},status= 400)
     else : 
 
 
@@ -79,7 +79,7 @@ def login(req):
             token = generate_jwt_token(d)
         else : 
             print("Invalid credentials")
-            return Response({"msg" : "Invalid credentials" , "success" : False },status= 400)
+            return Response({"message" : "Invalid credentials" , "success" : False },status= 400)
         d.pop('password') 
         
         
@@ -138,15 +138,15 @@ def register(req):
     d = collection.find_one({"email" : f"{email}"})
     print(role , "--------------------")
     if d :
-        return Response({"msg" : "User Email Already Exists" , "success" : False},status= 400)
+        return Response({"message" : "User Email Already Exists" , "success" : False},status= 400)
 
     if name and password and email and role :
         data = {"name" : name , "password" : encrypt (password) , "email" : email ,"role" : role}
         d = collection.insert_one(data)
     else :
-        return Response({"msg" : "Bad Request" , "success" : False},status= 400)
+        return Response({"message" : "Bad Request" , "success" : False},status= 400)
     print(d)
-    return Response({"msg" : "User Registered Successfully"  , "success" : True})
+    return Response({"message" : "User Registered Successfully"  , "success" : True})
 
 
 @api_view(['GET'])

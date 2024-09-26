@@ -5,6 +5,6 @@ from .views import *
 urlpatterns = [
     path('/form', dummy , name="dummy") ,
     path('/<str:collectionName>', getAll , name="getall") , 
-    path('/<str:collectionName>/<str:objId>', specificAction , name="specific") ,
+    path('/<str:collectionName>/<str:param>', specificAction , name="specific") , 
    
     ]

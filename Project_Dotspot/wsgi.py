@@ -10,7 +10,7 @@ https://docs.djangoproject.com/en/5.1/howto/deployment/wsgi/
 import os , threading
 
 from django.core.wsgi import get_wsgi_application
-from dashboard.views import  start_model_processing
+# from dashboard.views import  start_model_processing
 
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'Project_Dotspot.settings')
 

@@ -1,102 +1,385 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 import cv2
-import queue
 import threading
 import os
 import torch
 from ultralytics import YOLO, solutions
 import mimetypes
 from django.http import StreamingHttpResponse
+from pymongo import MongoClient
+import time
+from datetime import datetime, timedelta
+import json
+from queue import Queue
+from django.conf import settings
 
-# Global dictionaries to manage camera streams
-frame_queues = {}  # To hold frames for each camera URL/thread
-processing_flags = {}  # To control the thread processing for each camera
-processing_threads = {}  # To handle thread references
+
 
 model_path = os.path.join(os.path.dirname(__file__), 'model/demo.pt')
 videopath = os.path.join(os.path.dirname(__file__), './model/orange1.mp4')
 videopath1 = os.path.join(os.path.dirname(__file__), './model/sample1.mp4')
+database_name = settings.DATABASE_NAME
 
-global camera_urls 
 
-camera_urls = [
-    videopath1,
-    videopath,
-    # Add more camera URLs
-]
+client = MongoClient("mongodb+srv://dotspot:D0ts1t012345!@dotspot.el4d0.mongodb.net/?retryWrites=true&w=majority&appName=Dotspot")
+db = client[database_name] 
+
+db = client['dotspot'] 
+
 
 class HomeView(APIView):
     def get(self, request):
         return Response({"status": "running"})
 
 
+
+
+
+
+
+
+
+# -------------------------  functionality section -------------------------------------
+
+
+
+
+
+
+
+
+# Global dictionaries to manage camera streams
+
+# -------------------------  functionality section -------------------------------------
+
+
+
+global camera_update_data, last_entry_time, start_time , processing , camera_urls
+frame_queues = {}
+processing_flags = {}
+processing_threads = {}
+camera_update_data = {}
+camera_cache_data = {}
+start_time = {}
+last_entry_time = {}
+global counters
+counters = {}
+processing = False
+model_path = './models/demo.pt'
+
+model_path = 'models/demo.pt'
+camera_urls = ['./samplevideos/orange_10s.mp4']
+# camera_urls = ['./samplevideos/orange_10s.mp4', './samplevideos/sample1.mp4', 'rtsp://admin:Admin@123@115.244.221.74:2025/H.264']
+
+
+
+# # for database 
+# class Report(db.Model):
+#     id = db.Column(db.Integer, primary_key=True)
+#     start_time = db.Column(db.DateTime, default=datetime.now)
+#     end_time = db.Column(db.DateTime, nullable=True)
+#     duration = db.Column(db.Float, default=0.0)
+#     conveyor = db.Column(db.Integer, default=0)
+#     total_count = db.Column(db.Integer, default=0)
+#     last_updated = db.Column(db.DateTime, default=datetime.now)
+
+# with app.app_context():
+#     db.create_all()
+
+
+
+# class Utility(db.Model):
+#     id = db.Column(db.Integer, primary_key=True)
+#     time_buffer = db.Column(db.Integer, default=30)  # When this data was recorded
+#     camera_urls = db.Column(db.String, default = "")
+#     def __repr__(self):
+#         return f'<Utility {self.frame_count} frames>'
+
+
+# # Create the database and table
+# with app.app_context():
+#     db.create_all()
+
+global timeperiod_for_db_storage, camera_details
+timeperiod_for_db_storage = 30
+
+
+def get_camera_details():
+    global timeperiod_for_db_storage , camera_urls
+    collection = db['cameradetails']
+    data = list(collection.find({}))
+    for camera in get_camera_details :
+        camera_urls.append(data)
+    return [timeperiod_for_db_storage , camera ]
+get_camera_details()
+
+
+
+print("----------------------------------------------" , timeperiod_for_db_storage)
+
+
+
+
+@app.route('/changebuffer', methods=['get' ,'put'])
+def change_buffer ():
+    global timeperiod_for_db_storage ,  camera_urls
+    
+
+    return jsonify ({"time_buffer" : time_buffer ,  "camera_urls" : camera }) ,200
+
+
+
+# -------------------------  functionality section -------------------------------------
+
+def initialize_video_capture(url):
+    cap = cv2.VideoCapture(url, cv2.CAP_FFMPEG)
+    if not cap.isOpened():
+        print(f"Error: Could not open video source '{url}'")
+        return None
+    return cap
+
+
+def store_update(camera_url, data):
+    global camera_update_data, last_entry_time, start_time
+
+    if camera_update_data.get(camera_url) is None:
+        camera_update_data[camera_url] = {}
+
+    if start_time.get(camera_url) is None:
+        start_time[camera_url] = datetime.now()
+
+    update_data = camera_update_data[camera_url]
+
+    def process_nested_data(key, value):
+        if isinstance(value, dict):
+            if 'IN' in value and 'OUT' in value:
+                update_data[f"{key}_count"] = abs(value['OUT'] - value['IN'])
+            else:
+                for sub_key, sub_value in value.items():
+                    process_nested_data(f"{key}-{sub_key}", sub_value)
+        else:
+            update_data[key] = value
+
+    for key, value in data.items():
+        process_nested_data(key, value)
+
+    camera_update_data[camera_url]["total_count"] = sum(
+        val for k, val in update_data.items() if k.endswith('_count') and k != 'total_count'
+    )
+    
+    last_entry_time[camera_url] = datetime.now()
+    print(f"\nUpdated data for {camera_url}: {update_data}")
+    print(f"Start Time for {camera_url}: {start_time[camera_url]}")
+    print(f"Last Entry Time for {camera_url}: {last_entry_time[camera_url]}")
+
+
+
+def create_new_item_from_updates(camera_url):
+    global camera_update_data, last_entry_time, start_time, counters
+
+    current_time = datetime.now()
+    update_data = camera_update_data.get(camera_url, {})
+
+    # Check for valid datetime instances
+    if not isinstance(start_time.get(camera_url), datetime):
+        print(f"Invalid start_time for {camera_url}. Skipping update.", type(start_time.get(camera_url)), start_time)
+        return None
+
+    if not isinstance(last_entry_time.get(camera_url), datetime):
+        print(f"Invalid last_entry_time for {camera_url}. Skipping update.", type(last_entry_time.get(camera_url)), last_entry_time)
+        return None
+
+    # Calculate the total count dynamically
+    total_count = update_data["total_count"] = sum(
+        val for k, val in update_data.items() if k.endswith('_count') and k != 'total_count'
+    )
+
+    # Proceed if 10 seconds have passed and total count is not zero
+    if (current_time - last_entry_time[camera_url]) >= timedelta(minutes = timeperiod_for_db_storage ) and total_count != 0:
+        print(f"\nTotal count for {camera_url}: {total_count}")
+
+        with app.app_context():
+            # Check and add new columns dynamically if needed
+            inspector = inspect(db.engine)
+            table_columns = [col['name'] for col in inspector.get_columns('report')]  # Get existing column names
+
+            # Dynamically add new columns for counts that do not exist
+            for key, value in update_data.items():
+                if key.endswith('_count'):  # Process only the count fields
+                    # Replace hyphen with underscore to make column names safe for SQL
+                    safe_key = key.replace('-', '_').replace('1.5l', '1500ml')
+
+                    if safe_key not in table_columns:  # If column doesn't exist, add it
+                        alter_query = text(f'ALTER TABLE report ADD COLUMN {safe_key} INTEGER DEFAULT 0')
+                        db.session.execute(alter_query)
+                        db.session.commit()
+                        print(f"Added new column: {safe_key}")
+
+            # Create a new report
+            duration = int((last_entry_time[camera_url] - start_time[camera_url]).total_seconds())
+            new_report = Report(
+                start_time=start_time[camera_url],
+                total_count=total_count,
+                conveyor=camera_urls.index(camera_url),
+                last_updated=last_entry_time[camera_url],
+                end_time=last_entry_time[camera_url],
+                duration=duration
+            )
+
+            # Add and commit the new report to the database
+            db.session.add(new_report)
+            db.session.commit()
+            print(f"Created new report with ID: {new_report.id}")
+
+            # Dynamically update the count fields for the newly created report
+            for key, value in update_data.items():
+                if key.endswith('_count'):
+                    safe_key = key.replace('-', '_').replace('1.5l', '1500ml')
+                    # Update the specific column in the report
+                    update_query = text(f'UPDATE report SET {safe_key} = :value WHERE id = :report_id')
+                    db.session.execute(update_query, {'value': value, 'report_id': new_report.id})
+                    db.session.commit()
+
+            # Reinitialize the counter and reset data for the next update cycle
+            reinitialize_counter(camera_url)
+            camera_update_data[camera_url] = {key: 0 for key in update_data if key.endswith('_count')}
+            camera_update_data[camera_url]['total_count'] = 0
+            start_time[camera_url] = None
+            last_entry_time[camera_url] = None
+
+            return {'id': new_report.id, 'message': 'Report created successfully'}
+
+    return None
+
+
+def initialize_counter(camera_url):
+    global counters
+    line_points = [(0, 900), (3000, 900)]
+    counter = solutions.ObjectCounter(
+        view_img=False,
+        reg_pts=line_points,
+        names=YOLO(model_path).names,
+        draw_tracks=False,
+        region_thickness=4,
+        count_reg_color=(255, 233, 203),
+    )
+    counters[camera_url] = counter
+    print(f"Counter initialized for {camera_url}")
+
+
+def reinitialize_counter(camera_url):
+    global counters
+    if camera_url in counters:
+        # Manually reset the counts
+        counters[camera_url].class_wise_count.clear()  # Clear the class-wise count
+        print(f"Counter reset for {camera_url}")
+    else:
+        print(f"No existing counter found for {camera_url}. Initializing a new one.")
+        initialize_counter(camera_url)
+
+
 def start_model_processing():
-    """
-    Start processing YOLO model for all camera URLs, with separate thread and frame generation.
-    """
+    
+    global camera_cache_data, camera_update_data, counters, processing , camera_urls
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
 
-    def initialize_video_capture(url):
-        cap = cv2.VideoCapture(url, cv2.CAP_FFMPEG)
-        if not cap.isOpened():
-            print(f"Error: Could not open video source '{url}'")
-            return None
-        return cap
-
     def process_video(camera_url):
-        # Create a unique frame queue for each camera thread
-        frame_queue = queue.Queue(maxsize=100)
-        frame_queues[camera_url] = frame_queue
-        processing_flags[camera_url] = True
-
-        # Initialize YOLO model for each thread
+        print(f"Process started for {camera_url}")
+        
         model = YOLO(model_path).to(device)
 
-        # Define counter and settings for each thread
-        line_points = [(0, 900), (3000, 900)]
-        classes_to_count = list(range(100))
-        counter = solutions.ObjectCounter(
-            view_img=False,
-            reg_pts=line_points,
-            names=model.names,
-            draw_tracks=False,
-            region_thickness=4,
-            count_reg_color=(255, 233, 203),
-        )
+        if camera_url not in counters:
+            initialize_counter(camera_url)
+        counter = counters[camera_url]
 
         cap = initialize_video_capture(camera_url)
         if not cap:
-            print(f"Failed to initialize video for {camera_url}")
             return
 
-        print(f"Processing video from {camera_url}")
+        frame_skip = 2  # Skip every other frame to improve performance
+        frame_count = 0
 
-        while processing_flags[camera_url] and cap.isOpened():
-            success, im0 = cap.read()
+        while processing_flags.get(camera_url, True):
+            processing = True
+            success, frame = cap.read()
+
             if not success:
-                print(f"Video stream from {camera_url} is empty or done.")
                 cap.release()
                 cap = initialize_video_capture(camera_url)
+                if not cap:
+                    break
                 continue
 
-            # Run YOLO tracking and counting for the camera thread
-            tracks = model.track(im0, persist=True, show=False, classes=classes_to_count)
-            im0 = counter.start_counting(im0, tracks)
+            frame_count += 1
+            if frame_count % frame_skip != 0:  # Skip frames for efficiency
+                continue
 
-            # Ensure frame queue doesn't overflow, replace oldest frame if full
-            if frame_queue.full():
-                frame_queue.get()
-            frame_queue.put(im0)
+            # Start model inference
+            with torch.no_grad():  # Disabling gradient calculation for faster inference
+                tracks = model.track(frame, persist=True, show=False, classes=list(range(100)))
+            
+            frame = counter.start_counting(frame, tracks)
 
-        cap.release()
+            # Update camera cache only if counts changed
+            current_count = str(counter.class_wise_count)
+            if camera_cache_data.get(camera_url) != current_count:
+                camera_cache_data[camera_url] = current_count
+                try:
+                    store_update(camera_url, json.loads(current_count.replace("'", '"')))
+                    create_new_item_from_updates(camera_url)
+                except json.JSONDecodeError as e:
+                    print(f"JSON error: {e} for {camera_url}")
+            else:
+                if last_entry_time.get(camera_url) is None:
+                    last_entry_time[camera_url] = datetime.now()
 
-    # Start a unique thread for each camera URL
+                if start_time.get(camera_url) is None:
+                    start_time[camera_url] = last_entry_time.get(camera_url)
+                create_new_item_from_updates(camera_url)
+
+            # Manage frame queue more efficiently
+            if frame_queues[camera_url].full():
+                frame_queues[camera_url].get()
+            frame_queues[camera_url].put(frame)
+
+            time.sleep(0.01)  # Add a small delay to balance CPU/GPU load
+
+    # Launch threads for each camera URL
+    print(camera_urls , "-----------c---------------")
+    temp = list(set(camera_urls))
+    camera_urls = temp
+    print(temp)
     for url in camera_urls:
+        processing_flags[url] = True
+        processing = True
+        frame_queues[url] = Queue(maxsize=10)
         processing_threads[url] = threading.Thread(target=process_video, args=(url,))
         processing_threads[url].start()
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# ---------------------------------------------------
 
 def generate_frames(camera_url):
     """
