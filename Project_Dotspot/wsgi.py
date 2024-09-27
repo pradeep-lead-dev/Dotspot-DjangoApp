@@ -21,5 +21,5 @@ videopath =  os.path.join(os.path.dirname(__file__), 'model/orange1.mp4')
 
 
 # start_model_processing()
-start_watching()
+# start_watching()
 
