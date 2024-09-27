@@ -46,7 +46,7 @@ def getAll(req,collectionName):
 def specificAction(request , collectionName , param):
     collection = db[collectionName]
     query_field = request.headers.get('query-field', None)
-    print(request.headers)
+    # print(request.headers)
     if request.method == 'GET':
         try:
             if query_field:
