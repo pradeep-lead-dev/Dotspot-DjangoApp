@@ -17,63 +17,95 @@ print("------------workflow------------------")
 # Start watching for changes across the entire database
 from bson import ObjectId
 
-def watch_mongo_db():
-    # Connect to MongoDB
-    # Specify your collection
+automations_collection = db["workflow"]
 
-    # Define a pipeline to filter out changes marked by your app
-    pipeline = [
-        {
-            "$match": {
-              
-                "fullDocument.ignore_by_app": {"$exists": False}  # Ignore updates marked by the app
-            }
-        }
-    ]
 
-    try:
-        with db.watch(pipeline) as stream:
-            for change in stream:
-                collection_name = change['ns']['coll']
-                collection = db[collection_name]
-                print(f"Listening for changes in collection: {collection_name}...")
-                print(f"Change detected: {change}")
+def watch_changes():
+    with db.watch() as stream:
+        for change in stream:
+            print("Change detected:", change)
+            process_trigger(change)
 
-                # Handle insertions, updates, deletions
-                if change["operationType"] == "insert":
-                    print(f"New document inserted: {change['fullDocument']}")
-                elif change["operationType"] == "update":
-                    print(f"Document updated: {change['updateDescription']}")
-                    
-                    # Perform a status update and temporarily mark the document
-                    doc_id = change['documentKey']['_id']
-                    collection.update_one(
-                        {"_id": ObjectId(doc_id)},
-                        {
-                            "$set": {
-                                "status": "new_status",  # Update the status
-                                "ignore_by_app": True  # Mark the update to ignore in the watcher
-                            }
-                        }
-                    )
 
-                    # Optionally remove the ignore_by_app marker after a short delay
-                    # This allows future status updates to be detected again
-                    def remove_marker(doc_id):
-                        collection.update_one(
-                            {"_id": ObjectId(doc_id)},
-                            {"$unset": {"ignore_by_app": ""}}  # Remove the ignore marker
-                        )
 
-                    # Start a new thread to remove the marker after a delay
-                    threading.Timer(1, remove_marker, [doc_id]).start()
+def process_trigger(change):
+    # Extract details from the change event
 
-                elif change["operationType"] == "delete":
-                    print(f"Document deleted with ID: {change['documentKey']['_id']}")
-    except Exception as e:
-        print(f"Error watching MongoDB: {e}")
+    current_collection_name = change['ns']['coll']
+    document_id = change["documentKey"]["_id"]
+    updated_fields = change["updateDescription"]["updatedFields"]
+    print(current_collection_name,"---->" , updated_fields)
+    # Retrieve all active automations
+    active_automations = automations_collection.find({"active": True})
+    print("automation active ------->",active_automations)
+    for automation in active_automations:
+        trigger = automation["trigger"]
+        print("in loop ---->", trigger["tableName"] ,"---> ==",current_collection_name)
+        if trigger["tableName"] == current_collection_name and evaluate_condition(trigger, updated_fields ):
+            execute_actions(automation["actions"], document_id)
+
+def evaluate_condition(trigger, updated_fields):
+    """
+    Evaluates the condition of a trigger and checks if the updated fields match.
+    Supports both "and" and "or" logic.
+    """
+
+    # Handle the "and" conditions - all conditions in this list must be met.
+    if "and" in trigger["condition"] and trigger["condition"]["and"]:
+        and_conditions_met = all(
+            evaluate_single_condition(c, updated_fields) for c in trigger["condition"]["and"]
+        )
+    else:
+        and_conditions_met = True  # No "and" conditions, treat as true
+
+    # Handle the "or" conditions - at least one condition in this list must be met.
+    if "or" in trigger["condition"] and trigger["condition"]["or"]:
+        or_conditions_met = any(
+            evaluate_single_condition(c, updated_fields) for c in trigger["condition"]["or"]
+        )
+    else:
+        or_conditions_met = True  # No "or" conditions, treat as true
+
+    # Return true only if all "and" conditions are met and at least one "or" condition is satisfied.
+    return and_conditions_met and or_conditions_met
+
+
+def evaluate_single_condition(condition, updated_fields):
+    """
+    Evaluates a single condition based on the field value.
+    Compares the condition field value with the updated field value.
+    """
+    field_name = condition.get("field")
+    expected_value = condition.get("to")
+
+    # Ensure the field exists in the updated fields and matches the expected value
+    if field_name in updated_fields:
+        updated_value = updated_fields[field_name]
+        # Return true if the operation is satisfied (example: 'equals', can be extended to other operations)
+        return updated_value == expected_value or expected_value == "*"
+    return False
+
+
+
+def execute_actions(actions, document_id):
+    for action in actions:
+        if action["actionName"] == "updaterecord":
+            print("\n\n update detected")
+            update_record(action, document_id)
+        # Add more action handlers as needed
+
+
+def update_record(action, document_id):
+
+    fields_to_update = {field["fieldName"]: field["fieldValue"] for field in action["fields"]}
+    print("\n\n data to update",fields_to_update)
+    db[action.get('tableName')].update_one({"_id": document_id}, {"$set": fields_to_update})
+    print(f"\n\n\n Updated document {document_id} with fields: {fields_to_update}")
+
 
 def start_watching():
     # Start a new thread to watch MongoDB in the background
-    watcher_thread = threading.Thread(target=watch_mongo_db, daemon=True)
+    watcher_thread = threading.Thread(target=watch_changes, daemon=True)
     watcher_thread.start()
+
+
