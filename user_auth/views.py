@@ -12,12 +12,11 @@ import base64
 from functools import wraps
 
 
-# Replace the URI string with your MongoDB Atlas connection string
-client = MongoClient("mongodb+srv://dotspot:D0ts1t012345!@dotspot.el4d0.mongodb.net/?retryWrites=true&w=majority&appName=Dotspot")
+database_name = settings.DATABASE_NAME
+connection_string = settings.DATABASE_CONNECTION_STRING
 
-# Connect to a specific database
-db = client['dotspot']  # Replace with your database name
-
+client = MongoClient(connection_string)
+db = client[database_name] 
 # Connect to a specific collection
 collection = db['user']  # Replace with your collection name
 

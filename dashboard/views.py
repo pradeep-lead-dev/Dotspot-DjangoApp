@@ -11,8 +11,9 @@ from pymongo import MongoClient
 import time
 from datetime import datetime, timedelta
 import json
-from queue import Queue
+from queue import Queue , Empty 
 from django.conf import settings
+import numpy as np  # To create a blank frame if no frames are available
 
 
 
@@ -20,12 +21,14 @@ model_path = os.path.join(os.path.dirname(__file__), 'models/demo.pt')
 videopath = os.path.join(os.path.dirname(__file__), './model/orange_10s.mp4')
 # videopath1 = os.path.join(os.path.dirname(__file__), './model/sample1.mp4')
 database_name = settings.DATABASE_NAME
+connection_string = settings.DATABASE_CONNECTION_STRING
+# Connect to a specific database
 
 
-client = MongoClient("mongodb+srv://dotspot:D0ts1t012345!@dotspot.el4d0.mongodb.net/?retryWrites=true&w=majority&appName=Dotspot")
+client = MongoClient(connection_string)
 db = client[database_name] 
 
-db = client['dotspot'] 
+
 collection = db['records']
 
 class HomeView(APIView):
@@ -140,7 +143,7 @@ def store_update(camera_url, data):
     def process_nested_data(key, value):
         if isinstance(value, dict):
             if 'IN' in value and 'OUT' in value:
-                update_data[f"{key}_count"] = abs(value['OUT'] - value['IN'])
+                update_data[f"{key}_count"] = value['OUT'] - value['IN']
             else:
                 for sub_key, sub_value in value.items():
                     process_nested_data(f"{key}-{sub_key}", sub_value)
@@ -182,7 +185,7 @@ def create_new_item_from_updates(camera_url):
     )
 
     # Proceed if 10 seconds have passed and total count is not zero
-    if (current_time - last_entry_time[camera_url]) >= timedelta(minutes = (timeperiod_for_db_storage.get(camera_url) ) ) and total_count != 0:
+    if (current_time - last_entry_time[camera_url]) >= timedelta(minutes = (timeperiod_for_db_storage.get(camera_url) or 10 ) ) and total_count != 0:
         print(f"\nTotal count for {camera_url}: {total_count}")
 
        
@@ -340,24 +343,31 @@ def start_model_processing():
 
 
 # # ---------------------------------------------------
-
 def generate_frames(camera_url):
     """
     Generator function to retrieve the latest frame for each specific camera.
+    Streams default blank frames when no actual frame is available.
     """
     while processing_flags.get(camera_url, False):
         try:
             # Get the latest frame from the queue for the specified camera URL
             latest_frame = frame_queues[camera_url].get(timeout=1)
-        except Queue.Empty:
-            continue  # Skip if no frame is available
+        except Empty:
+            # Create a blank frame (for example, 640x480 black image) to keep the stream alive
+            # latest_frame = np.zeros((480, 640, 3), dtype=np.uint8)
+            continue
 
         # Encode the frame as JPEG
         ret, buffer = cv2.imencode('.jpg', latest_frame)
         frame = buffer.tobytes()
 
+        # Yield the frame to the stream
         yield (b'--frame\r\n'
                b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
+
+        # Optional: Add a small delay to avoid too much CPU usage when the queue is empty
+        time.sleep(0.1)
+
 
 
 class VideoFeed(APIView):
@@ -366,18 +376,18 @@ class VideoFeed(APIView):
     """
     def get(self, request, camera_no = 1):
         # Ensure the URL passed exists in the processing threads
-        print(str(camera_no).isnumeric() )
-        if ( not str(camera_no).isnumeric() ):
+        print(str(camera_no).isnumeric() , camera_no)
+        if ( not str(camera_no).isnumeric() or  int(camera_no) == 0 ):
             return Response({"error": "Bad Request"}, status=400)
 
-        cameraNo = int(camera_no)
+        cameraNo = int(camera_no)-1
 
-        if cameraNo >= len(camera_urls) or  camera_urls[cameraNo] not in camera_urls:
+        if cameraNo > len(camera_urls) or  camera_urls[cameraNo] not in camera_urls:
             return Response({"error": "Camera URL not found" }, status=404)
 
         # Stream the frames for the requested camera
         return StreamingHttpResponse(
-            generate_frames(camera_urls[cameraNo]),
+            generate_frames(camera_urls[cameraNo-1]),
             content_type='multipart/x-mixed-replace; boundary=frame'
         )
 

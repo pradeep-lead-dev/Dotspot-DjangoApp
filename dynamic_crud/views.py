@@ -6,11 +6,12 @@ from rest_framework import status
 from bson.objectid import ObjectId
 from django.conf import settings
 
-client = MongoClient("mongodb+srv://dotspot:D0ts1t012345!@dotspot.el4d0.mongodb.net/?retryWrites=true&w=majority&appName=Dotspot")
 restricted_fields  = settings.SENSITIVE_COLUMN
 non_editable_fields = settings.NON_EDITABLE_COLUMN
 database_name = settings.DATABASE_NAME
+connection_string = settings.DATABASE_CONNECTION_STRING
 # Connect to a specific database
+client = MongoClient(connection_string)
 db = client[database_name] 
 
 
