@@ -14,6 +14,7 @@ import json
 from queue import Queue , Empty 
 from django.conf import settings
 import numpy as np  # To create a blank frame if no frames are available
+from rest_framework.decorators import api_view
 
 
 
@@ -96,31 +97,26 @@ global timeperiod_for_db_storage, camera_details
 timeperiod_for_db_storage = {}
 
 
+# Fetch camera details from the database
 def get_camera_details():
-    global timeperiod_for_db_storage , camera_urls
+    global timeperiod_for_db_storage, camera_urls
+    # Simulating DB collection
     collection = db['cameradetails']
     data = list(collection.find({}))
-    for camera in data :
+    for camera in data:
         c_url = camera.get('cameraUrl')
         if c_url and c_url not in camera_urls:
             camera_urls.append(c_url)
-            timeperiod_for_db_storage[c_url] = camera.get('bufferTime',15)
+            timeperiod_for_db_storage[c_url] = camera.get('bufferTime', 15)
             cameradetails[c_url] = camera
-        print(c_url , "--->",len(camera_urls))
-    return [timeperiod_for_db_storage , camera ]
-
+        print(c_url, "--->", len(camera_urls))
+    return [timeperiod_for_db_storage, camera]
 
 
 get_camera_details()
 
 
-
-print("----------------------------------------------" ,camera_urls)
-
-
-
-
-
+# Initialize video capture
 def initialize_video_capture(url):
     cap = cv2.VideoCapture(url, cv2.CAP_FFMPEG)
     if not cap.isOpened():
@@ -129,6 +125,7 @@ def initialize_video_capture(url):
     return cap
 
 
+# Store updates for camera data
 def store_update(camera_url, data):
     global camera_update_data, last_entry_time, start_time
 
@@ -156,66 +153,56 @@ def store_update(camera_url, data):
     camera_update_data[camera_url]["total_count"] = sum(
         val for k, val in update_data.items() if k.endswith('_count') and k != 'total_count'
     )
-    
+
     last_entry_time[camera_url] = datetime.now()
     print(f"\nUpdated data for {camera_url}: {update_data}")
     print(f"Start Time for {camera_url}: {start_time[camera_url]}")
     print(f"Last Entry Time for {camera_url}: {last_entry_time[camera_url]}")
 
 
-
+# Create a new report from updates
 def create_new_item_from_updates(camera_url):
-    global camera_update_data, last_entry_time, start_time, counters
+    global camera_update_data, last_entry_time, start_time
 
     current_time = datetime.now()
     update_data = camera_update_data.get(camera_url, {})
 
-    # Check for valid datetime instances
     if not isinstance(start_time.get(camera_url), datetime):
-        print(f"Invalid start_time for {camera_url}. Skipping update.", type(start_time.get(camera_url)), start_time)
+        print(f"Invalid start_time for {camera_url}. Skipping update.")
         return None
 
     if not isinstance(last_entry_time.get(camera_url), datetime):
-        print(f"Invalid last_entry_time for {camera_url}. Skipping update.", type(last_entry_time.get(camera_url)), last_entry_time)
+        print(f"Invalid last_entry_time for {camera_url}. Skipping update.")
         return None
 
-    # Calculate the total count dynamically
     total_count = update_data["total_count"] = sum(
         val for k, val in update_data.items() if k.endswith('_count') and k != 'total_count'
     )
 
-    # Proceed if 10 seconds have passed and total count is not zero
-    if (current_time - last_entry_time[camera_url]) >= timedelta(minutes = (timeperiod_for_db_storage.get(camera_url) or 10 ) ) and total_count != 0:
+    if (current_time - last_entry_time[camera_url]) >= timedelta(minutes=(timeperiod_for_db_storage.get(camera_url) or 10)) and total_count != 0:
         print(f"\nTotal count for {camera_url}: {total_count}")
 
-       
         duration = int((last_entry_time[camera_url] - start_time[camera_url]).total_seconds())
-        
-        data_to_push = {"startTime" : start_time[camera_url], "endTime" : last_entry_time[camera_url],"Total_count":total_count,"duration" : duration}
-        # Dynamically add new columns for counts that do not exist
+        data_to_push = {
+            "startTime": start_time[camera_url],
+            "endTime": last_entry_time[camera_url],
+            "Total_count": total_count,
+            "duration": duration
+        }
+
         for key, value in update_data.items():
             data_to_push[key] = value
 
-            # Create a new report
-            # new_report = Report(
-            #     start_time=start_time[camera_url],
-            #     total_count=total_count,
-            #     conveyor=camera_urls.index(camera_url),
-            #     last_updated=last_entry_time[camera_url],
-            #     end_time=last_entry_time[camera_url],
-            #     duration=duration
-            # )
+        # Simulating DB insertion
+        collection.insert_one(data_to_push)
+        print(f"Created new report")
 
-            # Add and commit the new report to the database
-        new_report = collection.insert_one(data_to_push)
-        print(f"Created new report ")
-
-          
         return {'message': 'Report created successfully'}
 
     return None
 
 
+# Initialize the counter for object counting
 def initialize_counter(camera_url):
     global counters
     line_points = [(0, 900), (3000, 900)]
@@ -231,10 +218,10 @@ def initialize_counter(camera_url):
     print(f"Counter initialized for {camera_url}")
 
 
+# Reinitialize the counter (clear counts)
 def reinitialize_counter(camera_url):
     global counters
     if camera_url in counters:
-        # Manually reset the counts
         counters[camera_url].class_wise_count.clear()  # Clear the class-wise count
         print(f"Counter reset for {camera_url}")
     else:
@@ -242,84 +229,101 @@ def reinitialize_counter(camera_url):
         initialize_counter(camera_url)
 
 
-def start_model_processing():
-    
-    global camera_cache_data, camera_update_data, counters, processing , camera_urls
+# Start model processing for the specified camera
+def process_video(camera_url):
+    global camera_cache_data, camera_update_data, counters, processing, camera_urls
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
 
-    def process_video(camera_url):
-        print(f"Process started for {camera_url}")
-        
-        model = YOLO(model_path).to(device)
+    model = YOLO(model_path).to(device)
 
-        if camera_url not in counters:
-            initialize_counter(camera_url)
-        counter = counters[camera_url]
+    if camera_url not in counters:
+        initialize_counter(camera_url)
+    counter = counters[camera_url]
 
-        cap = initialize_video_capture(camera_url)
-        if not cap:
-            return
+    cap = initialize_video_capture(camera_url)
+    if not cap:
+        return
 
-        frame_skip = 2  # Skip every other frame to improve performance
-        frame_count = 0
+    frame_skip = 2  # Skip every other frame to improve performance
+    frame_count = 0
 
-        while processing_flags.get(camera_url, True):
-            processing = True
-            success, frame = cap.read()
+    while processing_flags.get(camera_url, True):
+        success, frame = cap.read()
+        if not success:
+            cap.release()
+            cap = initialize_video_capture(camera_url)
+            if not cap:
+                break
+            continue
 
-            if not success:
-                cap.release()
-                cap = initialize_video_capture(camera_url)
-                if not cap:
-                    break
-                continue
+        frame_count += 1
+        if frame_count % frame_skip != 0:  # Skip frames for efficiency
+            continue
 
-            frame_count += 1
-            if frame_count % frame_skip != 0:  # Skip frames for efficiency
-                continue
+        with torch.no_grad():
+            tracks = model.track(frame, persist=True, show=False, classes=list(range(100)))
 
-            # Start model inference
-            with torch.no_grad():  # Disabling gradient calculation for faster inference
-                tracks = model.track(frame, persist=True, show=False, classes=list(range(100)))
-            
-            frame = counter.start_counting(frame, tracks)
+        frame = counter.start_counting(frame, tracks)
 
-            # Update camera cache only if counts changed
-            current_count = str(counter.class_wise_count)
-            if camera_cache_data.get(camera_url) != current_count:
-                camera_cache_data[camera_url] = current_count
-                try:
-                    store_update(camera_url, json.loads(current_count.replace("'", '"')))
-                    create_new_item_from_updates(camera_url)
-                except json.JSONDecodeError as e:
-                    print(f"JSON error: {e} for {camera_url}")
-            else:
-                if last_entry_time.get(camera_url) is None:
-                    last_entry_time[camera_url] = datetime.now()
-
-                if start_time.get(camera_url) is None:
-                    start_time[camera_url] = last_entry_time.get(camera_url)
+        current_count = str(counter.class_wise_count)
+        if camera_cache_data.get(camera_url) != current_count:
+            camera_cache_data[camera_url] = current_count
+            try:
+                store_update(camera_url, json.loads(current_count.replace("'", '"')))
                 create_new_item_from_updates(camera_url)
+            except json.JSONDecodeError as e:
+                print(f"JSON error: {e} for {camera_url}")
 
-            # Manage frame queue more efficiently
-            if frame_queues[camera_url].full():
-                frame_queues[camera_url].get()
-            frame_queues[camera_url].put(frame)
+        if frame_queues[camera_url].full():
+            frame_queues[camera_url].get()
+        frame_queues[camera_url].put(frame)
 
-            time.sleep(0.01)  # Add a small delay to balance CPU/GPU load
+        time.sleep(0.01)  # Balance CPU/GPU load
 
-    # Launch threads for each camera URL
-    print(camera_urls , "-----------c---------------")
-    temp = list(set(camera_urls))
-    camera_urls = temp
-    print(temp)
-    for url in camera_urls:
-        processing_flags[url] = True
-        processing = True
-        frame_queues[url] = Queue(maxsize=10)
-        processing_threads[url] = threading.Thread(target=process_video, args=(url,))
-        processing_threads[url].start()
+
+# Start camera processing API endpoint
+@api_view(['POST'])
+def start_camera(request):
+    global camera_urls, processing_threads, processing_flags
+
+    camera_url = request.data.get('camera_url')
+    if not camera_url:
+        return Response({'error': 'No camera URL provided'}, status=400)
+
+    if camera_url not in camera_urls:
+        camera_urls.append(camera_url)
+
+    if not processing_flags.get(camera_url, False):
+        processing_flags[camera_url] = True
+        frame_queues[camera_url] = Queue(maxsize=10)
+        processing_threads[camera_url] = threading.Thread(target=process_video, args=(camera_url,))
+        processing_threads[camera_url].start()
+        return Response({'message': f'Camera {camera_url} started processing'})
+
+    return Response({'message': f'Camera {camera_url} is already running'})
+
+
+# Stop camera processing API endpoint
+@api_view(['POST'])
+def stop_camera(request):
+    global processing_flags, processing_threads
+
+    camera_url = request.data.get('camera_url')
+    if not camera_url:
+        return Response({'error': 'No camera URL provided'}, status=400)
+
+    if processing_flags.get(camera_url, False):
+        processing_flags[camera_url] = False
+        # Ensure data is saved before stopping
+        create_new_item_from_updates(camera_url)
+        if processing_threads.get(camera_url):
+            processing_threads[camera_url].join()  # Wait for the thread to finish
+            return Response({'message': f'Camera {camera_url} stopped and data saved'})
+
+    return Response({'message': f'Camera {camera_url} was not running'})
+
+
 
 
 
