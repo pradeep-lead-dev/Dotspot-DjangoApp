@@ -202,3 +202,4 @@ def start_watching():
     """
     watcher_thread = threading.Thread(target=watch_changes, daemon=True)
     watcher_thread.start()
+

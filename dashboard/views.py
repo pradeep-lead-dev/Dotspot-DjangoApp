@@ -15,6 +15,7 @@ from queue import Queue , Empty
 from django.conf import settings
 import numpy as np  # To create a blank frame if no frames are available
 from rest_framework.decorators import api_view
+from bson.objectid import ObjectId
 
 
 
@@ -61,7 +62,9 @@ processing = False
 model_path = './models/demo.pt'
 
 model_path = 'models/demo.pt'
-camera_urls = ['models/orange_10s.mp4']
+camera_urls = []
+
+camera_storage_ids = {}
 # camera_urls = ['./samplevideos/orange_10s.mp4', './samplevideos/sample1.mp4', 'rtsp://admin:Admin@123@115.244.221.74:2025/H.264']
 
 
@@ -101,7 +104,7 @@ timeperiod_for_db_storage = {}
 def get_camera_details():
     global timeperiod_for_db_storage, camera_urls
     # Simulating DB collection
-    collection = db['cameradetails']
+    collection = db['camera']
     data = list(collection.find({}))
     camera = None
     for camera in data:
@@ -115,7 +118,7 @@ def get_camera_details():
 
 
 get_camera_details()
-
+print("cam details ---->",cameradetails)
 
 # Initialize video capture
 def initialize_video_capture(url):
@@ -150,24 +153,28 @@ def store_update(camera_url, data):
 
     for key, value in data.items():
         process_nested_data(key, value)
+    if not isinstance(last_entry_time.get(camera_url), datetime):
+        print(f"Invalid last_entry_time for {camera_url}. Skipping update.")
+        last_entry_time[camera_url] = datetime.now()
 
     camera_update_data[camera_url]["total_count"] = sum(
         val for k, val in update_data.items() if k.endswith('_count') and k != 'total_count'
     )
 
-    last_entry_time[camera_url] = datetime.now()
+    # last_entry_time[camera_url] = datetime.now()
     print(f"\nUpdated data for {camera_url}: {update_data}")
     print(f"Start Time for {camera_url}: {start_time[camera_url]}")
-    print(f"Last Entry Time for {camera_url}: {last_entry_time[camera_url]}")
+    print(f"Last Entry Time for {camera_url}: {last_entry_time.get(camera_url)}")
 
 
 # Create a new report from updates
 def create_new_item_from_updates(camera_url):
+    collection = db['master']
     global camera_update_data, last_entry_time, start_time
 
     current_time = datetime.now()
     update_data = camera_update_data.get(camera_url, {})
-
+    print("entered create function")
     if not isinstance(start_time.get(camera_url), datetime):
         print(f"Invalid start_time for {camera_url}. Skipping update.")
         return None
@@ -180,10 +187,14 @@ def create_new_item_from_updates(camera_url):
         val for k, val in update_data.items() if k.endswith('_count') and k != 'total_count'
     )
 
-    if (current_time - last_entry_time[camera_url]) >= timedelta(minutes=(timeperiod_for_db_storage.get(camera_url) or 10)) and total_count != 0:
+    if (current_time - last_entry_time[camera_url]) >= timedelta(seconds =(timeperiod_for_db_storage.get(camera_url) or 5)) and total_count != 0:
         print(f"\nTotal count for {camera_url}: {total_count}")
 
         duration = int((last_entry_time[camera_url] - start_time[camera_url]).total_seconds())
+
+       
+
+                
         data_to_push = {
             "startTime": start_time[camera_url],
             "endTime": last_entry_time[camera_url],
@@ -195,10 +206,10 @@ def create_new_item_from_updates(camera_url):
             data_to_push[key] = value
 
         # Simulating DB insertion
-        collection.insert_one(data_to_push)
-        print(f"Created new report")
-
-        return {'message': 'Report created successfully'}
+        collection.update_one({"_id" : ObjectId(camera_storage_ids[camera_url])  } , {"$set":data_to_push }, upsert=True )
+        print(f"updated new report")
+        last_entry_time[camera_url] = current_time
+        return {'message': 'Report updated successfully successfully'}
 
     return None
 
@@ -268,11 +279,11 @@ def process_video(camera_url):
         frame = counter.start_counting(frame, tracks)
 
         current_count = str(counter.class_wise_count)
-        if camera_cache_data.get(camera_url) != current_count:
+        if camera_cache_data.get(camera_url) != current_count or True:
             camera_cache_data[camera_url] = current_count
             try:
                 store_update(camera_url, json.loads(current_count.replace("'", '"')))
-                # create_new_item_from_updates(camera_url)
+                create_new_item_from_updates(camera_url)
             except json.JSONDecodeError as e:
                 print(f"JSON error: {e} for {camera_url}")
 
@@ -286,11 +297,16 @@ def process_video(camera_url):
 # Start camera processing API endpoint
 @api_view(['POST'])
 def start_camera(request):
-    global camera_urls, processing_threads, processing_flags
+    global camera_urls, processing_threads, processing_flags , camera_storage_ids
 
     camera_url = request.data.get('camera_url')
+    obj_id = request.data.get('id')
+    print(obj_id , camera_url)
+    if not obj_id:
+        return Response({'error': 'No camera Storage Id provided'}, status=400)
     if not camera_url:
         return Response({'error': 'No camera URL provided'}, status=400)
+    camera_storage_ids[camera_url] = obj_id
 
     if camera_url not in camera_urls:
         camera_urls.append(camera_url)
@@ -318,6 +334,7 @@ def stop_camera(request):
         processing_flags[camera_url] = False
         # Ensure data is saved before stopping
         create_new_item_from_updates(camera_url)
+        reinitialize_counter(camera_url)
         if processing_threads.get(camera_url):
             processing_threads[camera_url].join()  # Wait for the thread to finish
             return Response({'message': f'Camera {camera_url} stopped and data saved'})
@@ -396,7 +413,7 @@ class VideoFeed(APIView):
 
         # Stream the frames for the requested camera
         return StreamingHttpResponse(
-            generate_frames(camera_urls[cameraNo-1]),
+            generate_frames(camera_urls[cameraNo]),
             content_type='multipart/x-mixed-replace; boundary=frame'
         )
 
