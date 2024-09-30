@@ -103,6 +103,7 @@ def get_camera_details():
     # Simulating DB collection
     collection = db['cameradetails']
     data = list(collection.find({}))
+    camera = None
     for camera in data:
         c_url = camera.get('cameraUrl')
         if c_url and c_url not in camera_urls:

@@ -11,7 +11,6 @@ from Crypto.Util.Padding import pad, unpad
 import base64
 from functools import wraps
 
-
 database_name = settings.DATABASE_NAME
 connection_string = settings.DATABASE_CONNECTION_STRING
 
@@ -48,6 +47,7 @@ def decrypt(encrypted_base64: str) -> str:
     return decrypted_data.decode('utf-8')
 
 def generate_jwt_token(user):
+    print(user)
     payload = {
         'user_id': str(user.get("_id")),  # Use string for MongoDB ObjectId
         'username': user.get("name"),

@@ -104,7 +104,28 @@ def specificAction(request , collectionName , param):
                 return Response({'success': False, 'message': f'{collectionName} not found'}, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
             return Response({'success': False, 'message': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+
+
+
+@api_view(['GET'])
+def get_all_collections(req):
+    try :
+        collections = db.list_collection_names()
+        print(collections)
+    # Print the names of the collections
+        for collection in collections:
+            print(collection)
+        return Response({'success': True, "collections" : collections },status=status.HTTP_200_OK)
+    except Exception as e:
+            return Response({'success': False, 'message': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         
+
+
+
+
+
 
 data = {
         "tableName": "Master Table",
