@@ -108,7 +108,7 @@ def get_camera_details():
         c_url = camera.get('cameraUrl')
         if c_url and c_url not in camera_urls:
             camera_urls.append(c_url)
-            timeperiod_for_db_storage[c_url] = camera.get('bufferTime', 15)
+            timeperiod_for_db_storage[c_url] = 10
             cameradetails[c_url] = camera
         print(c_url, "--->", len(camera_urls))
     return [timeperiod_for_db_storage, camera]
