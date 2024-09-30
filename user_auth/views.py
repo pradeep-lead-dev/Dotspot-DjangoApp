@@ -48,9 +48,35 @@ def decrypt(encrypted_base64: str) -> str:
 
 def generate_jwt_token(user):
     print(user)
+    try :
+        permissions = []
+        if user.get('permissions'):
+            permissions = list(user.get('permissions').split(","))
+
+        
+    except:
+        permissions = []
+    roles = user.get('roles')
+    
+    if roles:
+        for role in roles:
+            collection = db['roles'] 
+            roleData = collection.find_one({"roleName" : role}) 
+            if roleData:
+                roleDataPermisions = roleData.get("permissions")
+                if roleDataPermisions:
+                    permissions += roleDataPermisions.split(",")
+                    print("\nrole permission ------>" , roleDataPermisions )
+            
+            print(role)
+   
+    finalPermissions = list(set(permissions))
+    finalPermissions.sort()
+    
     payload = {
         'user_id': str(user.get("_id")),  # Use string for MongoDB ObjectId
         'username': user.get("name"),
+        'permissions':finalPermissions,
         'exp': datetime.utcnow() + timedelta(days=1),  # Expiration time
         'iat': datetime.utcnow()  # Issued at time
     }
@@ -133,14 +159,15 @@ def register(req):
     name = req.data.get('name')
     password = req.data.get('password')
     email = req.data.get('email')
-    role = req.data.get('role','user') 
+    role = req.data.get('roles',[]) 
+    permission = req.data.get('permissions',"") 
     d = collection.find_one({"email" : f"{email}"})
     print(role , "--------------------")
     if d :
         return Response({"message" : "User Email Already Exists" , "success" : False},status= 400)
 
     if name and password and email and role :
-        data = {"name" : name , "password" : encrypt (password) , "email" : email ,"role" : role}
+        data = {"name" : name , "password" : encrypt (password) , "email" : email ,"roles" : role , "permissions":permission}
         d = collection.insert_one(data)
     else :
         return Response({"message" : "Bad Request" , "success" : False},status= 400)

@@ -117,7 +117,7 @@ def get_all_collections(req):
     # Print the names of the collections
         for collection in collections:
             print(collection)
-        return Response({'success': True, "collections" : collections },status=status.HTTP_200_OK)
+        return Response({'success': True, "data" : collections },status=status.HTTP_200_OK)
     except Exception as e:
             return Response({'success': False, 'message': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         

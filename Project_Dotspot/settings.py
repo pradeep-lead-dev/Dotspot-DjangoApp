@@ -188,7 +188,7 @@ JWT_SECRET_KEY = "Dotsp0t12345"
 SECRET_ENCRYPTION_KEY = 'YourGeneratedKeyHere'
 SENSITIVE_COLUMN = ['pw','password']
 NON_EDITABLE_COLUMN = ['name',"_id"]
-DATABASE_NAME = "dotspot"
+DATABASE_NAME = "podaran"
 DATABASE_CONNECTION_STRING = "mongodb+srv://dotspot:D0ts1t012345!@dotspot.el4d0.mongodb.net/?retryWrites=true&w=majority&appName=Dotspot"
 
 
