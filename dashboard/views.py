@@ -271,7 +271,7 @@ def process_video(camera_url):
             camera_cache_data[camera_url] = current_count
             try:
                 store_update(camera_url, json.loads(current_count.replace("'", '"')))
-                create_new_item_from_updates(camera_url)
+                # create_new_item_from_updates(camera_url)
             except json.JSONDecodeError as e:
                 print(f"JSON error: {e} for {camera_url}")
 
@@ -385,9 +385,13 @@ class VideoFeed(APIView):
             return Response({"error": "Bad Request"}, status=400)
 
         cameraNo = int(camera_no)-1
-
-        if cameraNo > len(camera_urls) or  camera_urls[cameraNo] not in camera_urls:
+        
+        if cameraNo >= len(camera_urls) or  camera_urls[cameraNo] not in camera_urls:
             return Response({"error": "Camera URL not found" }, status=404)
+        
+        camera_url = camera_urls[cameraNo]
+        if not processing_flags.get(camera_url, False):
+            return Response({"error": "Camera Processing Not yet Started" }, status=404)
 
         # Stream the frames for the requested camera
         return StreamingHttpResponse(

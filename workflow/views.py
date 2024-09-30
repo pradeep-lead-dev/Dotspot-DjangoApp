@@ -3,6 +3,8 @@ from django.conf import settings
 from pymongo import MongoClient
 import threading
 import subprocess
+import requests
+from bson.objectid import ObjectId
 
 
 # Connect to MongoDB
@@ -30,9 +32,11 @@ def watch_changes():
 
 def process_trigger(change):
     # Extract details from the change event
-
+    global current_collection_name , document_id, current_document
     current_collection_name = change['ns']['coll']
     document_id = change["documentKey"]["_id"]
+    current_document = db[current_collection_name].find_one({"_id" : ObjectId(document_id)})
+    
     updated_fields = change["updateDescription"]["updatedFields"]
     print(current_collection_name,"---->" , updated_fields)
     # Retrieve all active automations
@@ -42,7 +46,7 @@ def process_trigger(change):
         trigger = automation["trigger"]
         print("in loop ---->", trigger["tableName"] ,"---> ==",current_collection_name)
         if trigger["tableName"] == current_collection_name and evaluate_condition(trigger, updated_fields ):
-            execute_actions(automation["actions"], document_id)
+            execute_actions(automation["actions"], document_id, updated_fields)
 
 def evaluate_condition(trigger, updated_fields):
     """
@@ -87,11 +91,15 @@ def evaluate_single_condition(condition, updated_fields):
 
 
 
-def execute_actions(actions, document_id):
+def execute_actions(actions, document_id , updated_fields ):
     for action in actions:
         if action["actionName"] == "updaterecord":
             print("\n\n update detected")
             update_record(action, document_id)
+
+
+        elif action["actionName"] == "startcamera":
+            start_camera(action , updated_fields)
         # Add more action handlers as needed
 
 
@@ -101,6 +109,43 @@ def update_record(action, document_id):
     print("\n\n data to update",fields_to_update)
     db[action.get('tableName')].update_one({"_id": document_id}, {"$set": fields_to_update})
     print(f"\n\n\n Updated document {document_id} with fields: {fields_to_update}")
+    print(f"\n\n\n data updated")
+
+def start_camera(action,updated_fields):
+    """
+    Trigger an API call to start a camera based on the given action configuration.
+    """
+    try:
+        api_url = "http://localhost:8000/api/dashboard/start-camera"  # The API endpoint URL from the JSON
+        tableName = action.get("tableName")
+        collection = db[tableName]
+
+        camera_obj_id = current_document.get(action.get('fieldName'))
+        print(camera_obj_id,"---->id")
+        tableDocument = db[tableName].find_one({'_id': ObjectId(camera_obj_id)})
+        print('table-->',camera_obj_id, tableName, tableDocument)
+        cameraUrl = tableDocument.get('cameraUrl')
+        
+         # The camera ID or any other required parameter
+        print(cameraUrl)
+
+
+        if not cameraUrl:
+            print("No API URL provided for startcamera action.")
+            return
+        # Make an API call using the provided route (e.g., POST request)
+        response = requests.post(api_url, json={"camera_url": cameraUrl})
+
+        # Check if the request was successful
+        if response.status_code == 200:
+            print(response.text)
+            print(f"Camera {cameraUrl} started successfully.")
+        else:
+            print(f"Failed to start camera {cameraUrl}. Status code: {response.status_code}")
+            print("Response:", response.text)
+    except Exception as e:
+        print(f"Error while starting camera: {e}")
+
 
 
 def start_watching():
