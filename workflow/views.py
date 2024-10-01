@@ -181,9 +181,9 @@ def start_camera(action, updated_fields,document_id,stop=False):
         if not cameraUrl:
             print("No API URL provided for camera action.")
             return
-        
+        print(document_id,type(document_id) ,str(document_id),"doc id")
         # Make an API call using the provided route (e.g., POST request)
-        response = requests.post(api_url, json={"camera_url": cameraUrl,"id":document_id })
+        response = requests.post(api_url, json={"camera_url": cameraUrl,"id":str(document_id) })
 
         # Check if the request was successful
         if response.status_code == 200:

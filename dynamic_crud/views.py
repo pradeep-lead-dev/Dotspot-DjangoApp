@@ -35,14 +35,15 @@ def getAll(req,collectionName):
     
     if req.method == 'POST' :
         dataToPost = req.data
-        dataToPost["updated_at"] = datetime.datetime()
-        dataToPost["created_at"] = datetime.datetime()
+        dataToPost["updated_at"] = datetime.datetime.now()
+        dataToPost["created_at"] = datetime.datetime.now()
 
         try :
             data = collection.insert_one(dataToPost)
         
-            return Response({"message" : f"{collectionName} created Successfully" ,"success" : True },status=201)
+            return Response({"message" : f"{str(collectionName).capitalize()} created Successfully" ,"success" : True },status=201)
         except Exception as e:
+            print(e)
             return Response({"message" : "Request Unsuccessful" ,"success" : False },status=400)
 
 
@@ -72,9 +73,10 @@ def specificAction(request , collectionName , param):
                 # Filter out restricted fields
                 
             else:
-                return Response({'success': False , 'message': f'{collectionName} not found'}, status=status.HTTP_404_NOT_FOUND)
+                return Response({'success': False , 'message': f'{str(collectionName).capitalize()} not found'}, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
-            return Response({'success': False , 'message': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            print(e)
+            return Response({'success': False , 'message': str(e).capitalize()}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     if request.method == "PUT":
 
@@ -85,17 +87,18 @@ def specificAction(request , collectionName , param):
             for field in updated_data:
                 if field not in non_editable_fields:
                     filtered_data[field] = updated_data[field]  
-            filtered_data["updated_at"] = datetime.datetime()
+            filtered_data["updated_at"] = datetime.datetime.now()
             if query_field:
                 result = collection.update_one({query_field: param}, {'$set': filtered_data})
             else:
                 result = collection.update_one({'_id': ObjectId(param)}, {'$set': filtered_data})
             if result.matched_count:
-                return Response({'success': True, 'message': f'{collectionName} updated'}, status=status.HTTP_200_OK)
+                return Response({'success': True, 'message': f'{str(collectionName).capitalize()} updated'}, status=status.HTTP_200_OK)
             else:
-                return Response({'success': False, 'message': f'{collectionName} not found'}, status=status.HTTP_404_NOT_FOUND)
+                return Response({'success': False, 'message': f'{str(collectionName).capitalize()} not found'}, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
-            return Response({'success': False, 'message': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            print(e)
+            return Response({'success': False, 'message': str(e).capitalize()}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         
     if request.method == "DELETE":
         try:
@@ -104,11 +107,12 @@ def specificAction(request , collectionName , param):
             else:
                 result = collection.delete_one({'_id': ObjectId(param)})
             if result.deleted_count:
-                return Response({'success': True , 'message': f'{collectionName} deleted'}, status=status.HTTP_200_OK)
+                return Response({'success': True , 'message': f'{str(collectionName).capitalize()} deleted'}, status=status.HTTP_200_OK)
             else:
-                return Response({'success': False, 'message': f'{collectionName} not found'}, status=status.HTTP_404_NOT_FOUND)
+                return Response({'success': False, 'message': f'{str(collectionName).capitalize()} not found'}, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
-            return Response({'success': False, 'message': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            print(e)
+            return Response({'success': False, 'message': str(e).capitalize()}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 
@@ -124,7 +128,8 @@ def get_all_collections(req):
             print(collection)
         return Response({'success': True, "data" : collections },status=status.HTTP_200_OK)
     except Exception as e:
-            return Response({'success': False, 'message': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            print(e)
+            return Response({'success': False, 'message': str(e).capitalize()}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         
 
 
