@@ -141,10 +141,10 @@ def execute_actions(actions, document_id, updated_fields):
             update_record(action, document_id)
 
         elif action["actionName"] == "startcamera":
-            start_camera(action, updated_fields)
+            start_camera(action, updated_fields,document_id)
         
         elif action["actionName"] == "stopcamera":
-            start_camera(action, updated_fields,stop=True)
+            start_camera(action, updated_fields,document_id,stop=True)
 
 
 def update_record(action, document_id):
@@ -158,7 +158,7 @@ def update_record(action, document_id):
     print(f"Updated document {document_id} with fields: {fields_to_update}")
 
 
-def start_camera(action, updated_fields,stop=False):
+def start_camera(action, updated_fields,document_id,stop=False):
     """
     Trigger an API call to start a camera based on the given action configuration.
     """
@@ -183,7 +183,7 @@ def start_camera(action, updated_fields,stop=False):
             return
         
         # Make an API call using the provided route (e.g., POST request)
-        response = requests.post(api_url, json={"camera_url": cameraUrl})
+        response = requests.post(api_url, json={"camera_url": cameraUrl,"id":document_id })
 
         # Check if the request was successful
         if response.status_code == 200:

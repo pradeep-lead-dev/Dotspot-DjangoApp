@@ -5,6 +5,7 @@ from pymongo import MongoClient
 from rest_framework import status
 from bson.objectid import ObjectId
 from django.conf import settings
+import datetime
 
 restricted_fields  = settings.SENSITIVE_COLUMN
 non_editable_fields = settings.NON_EDITABLE_COLUMN
@@ -34,6 +35,9 @@ def getAll(req,collectionName):
     
     if req.method == 'POST' :
         dataToPost = req.data
+        dataToPost["updated_at"] = datetime.utcnow()
+        dataToPost["created_at"] = datetime.utcnow()
+
         try :
             data = collection.insert_one(dataToPost)
         
@@ -75,12 +79,13 @@ def specificAction(request , collectionName , param):
     if request.method == "PUT":
 
         try:
+            
             updated_data = request.data  # Get the data from the requestuest body
             filtered_data = {}
             for field in updated_data:
                 if field not in non_editable_fields:
                     filtered_data[field] = updated_data[field]  
-
+            filtered_data["updated_at"] = datetime.utcnow()
             if query_field:
                 result = collection.update_one({query_field: param}, {'$set': filtered_data})
             else:

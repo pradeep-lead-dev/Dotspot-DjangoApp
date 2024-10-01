@@ -20,12 +20,12 @@ from bson.objectid import ObjectId
 
 
 model_path = os.path.join(os.path.dirname(__file__), 'models/demo.pt')
-videopath = os.path.join(os.path.dirname(__file__), './model/orange_10s.mp4')
+videopath = os.path.join(os.path.dirname(__file__), './samplevideos/orange_10s.mp4')
 # videopath1 = os.path.join(os.path.dirname(__file__), './model/sample1.mp4')
 database_name = settings.DATABASE_NAME
 connection_string = settings.DATABASE_CONNECTION_STRING
 # Connect to a specific database
-
+print("video",videopath)
 
 client = MongoClient(connection_string)
 db = client[database_name] 
@@ -47,7 +47,7 @@ class HomeView(APIView):
 
 
 
-global camera_update_data, last_entry_time, start_time , processing , camera_urls , cameradetails
+global camera_update_data, last_entry_time, start_time , processing , camera_urls , cameradetails , existingPackageData
 frame_queues = {}
 processing_flags = {}
 processing_threads = {}
@@ -58,11 +58,13 @@ last_entry_time = {}
 global counters
 counters = {}
 cameradetails = {}
+existingPackageData = {}
+uploadPackageData = {}
 processing = False
 model_path = './models/demo.pt'
 
 model_path = 'models/demo.pt'
-camera_urls = []
+camera_urls = ["D:\pythonProjectNew\samplevideos\orange_10s.mp4"]
 
 camera_storage_ids = {}
 # camera_urls = ['./samplevideos/orange_10s.mp4', './samplevideos/sample1.mp4', 'rtsp://admin:Admin@123@115.244.221.74:2025/H.264']
@@ -167,6 +169,54 @@ def store_update(camera_url, data):
     print(f"Last Entry Time for {camera_url}: {last_entry_time.get(camera_url)}")
 
 
+def update_existing_with_data(existing_data, data_to_push):
+    """Update existing data with new data, modifying existing keys and adding new ones as needed."""
+    
+    # Convert existing data (list of dicts) into a dictionary indexed by 'variant' for easier lookup
+    existing_data_dict = {item['variant']: item for item in existing_data}
+    
+    # Initialize the updated package data list
+    updated_package_data = []
+    
+    # Keep track of the highest key value in existing data, only for items that have a key
+    current_max_key = max((item['key'] for item in existing_data if 'key' in item), default=-1)
+    
+    # First, update the data from `data_to_push` with actual counts
+    for variant, actual_count in data_to_push.items():
+        if variant != "total_count":  # Skip 'total_count'
+            if variant in existing_data_dict:
+                # Update existing entry with new actual count
+                updated_package_data.append({
+                    'key': existing_data_dict[variant]['key'],
+                    'variant': variant,
+                    'targetCount': existing_data_dict[variant].get('targetCount', 0),  # Keep existing targetCount
+                    'actualCount': actual_count  # Update actualCount
+                })
+            else:
+                # If the variant is new, add it with a default targetCount of 0 and a new key
+                current_max_key += 1
+                updated_package_data.append({
+                    'key': current_max_key,
+                    'variant': variant,
+                    'targetCount': 0,  # Default target count
+                    'actualCount': actual_count  # New actual count
+                })
+
+    # Then, retain existing variants that were not updated
+    for item in existing_data:
+        if item['variant'] not in data_to_push:
+            # Retain old data, ensuring to keep existing keys if present
+            updated_package_data.append({
+                'key': item.get('key', current_max_key + 1),  # Use the existing key or generate a new one
+                'variant': item['variant'],
+                'targetCount': item.get('targetCount', 0),  # Default if not present
+                'actualCount': item.get('actual_count', 0)  # Use existing actual_count if present
+            })
+    sorted_data = sorted(updated_package_data, key=lambda x: x['key'])
+
+    return sorted_data
+
+
 # Create a new report from updates
 def create_new_item_from_updates(camera_url):
     collection = db['master']
@@ -195,18 +245,26 @@ def create_new_item_from_updates(camera_url):
        
 
                 
-        data_to_push = {
-            "startTime": start_time[camera_url],
-            "endTime": last_entry_time[camera_url],
-            "Total_count": total_count,
-            "duration": duration
-        }
-
+        data_to_push = {}
         for key, value in update_data.items():
             data_to_push[key] = value
 
+        existingPackageData[camera_url] = collection.find_one({"_id" : ObjectId(camera_storage_ids[camera_url])})
+
+        print("data--->",data_to_push ,"\n\n", existingPackageData[camera_url].get("packageData") )
+        uploadPackageData[camera_url] = update_existing_with_data(existingPackageData[camera_url].get("packageData",{}), data_to_push)
+        
+        print("temp --->")
+        final_data = {
+            "startTime": start_time[camera_url],
+            "endTime": last_entry_time[camera_url],
+            "totalCount": total_count,
+            "duration": duration,
+            "packageData" : uploadPackageData[camera_url]
+        }
+
         # Simulating DB insertion
-        collection.update_one({"_id" : ObjectId(camera_storage_ids[camera_url])  } , {"$set":data_to_push }, upsert=True )
+        collection.update_one({"_id" : ObjectId(camera_storage_ids[camera_url])  } , {"$set":final_data }, upsert=True )
         print(f"updated new report")
         last_entry_time[camera_url] = current_time
         return {'message': 'Report updated successfully successfully'}
