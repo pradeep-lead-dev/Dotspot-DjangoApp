@@ -35,8 +35,8 @@ def getAll(req,collectionName):
     
     if req.method == 'POST' :
         dataToPost = req.data
-        dataToPost["updated_at"] = datetime.utcnow()
-        dataToPost["created_at"] = datetime.utcnow()
+        dataToPost["updated_at"] = datetime.datetime()
+        dataToPost["created_at"] = datetime.datetime()
 
         try :
             data = collection.insert_one(dataToPost)
@@ -85,7 +85,7 @@ def specificAction(request , collectionName , param):
             for field in updated_data:
                 if field not in non_editable_fields:
                     filtered_data[field] = updated_data[field]  
-            filtered_data["updated_at"] = datetime.utcnow()
+            filtered_data["updated_at"] = datetime.datetime()
             if query_field:
                 result = collection.update_one({query_field: param}, {'$set': filtered_data})
             else:
