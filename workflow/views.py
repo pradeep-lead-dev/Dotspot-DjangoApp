@@ -146,6 +146,9 @@ def execute_actions(actions, document_id, updated_fields):
         elif action["actionName"] == "stopcamera":
             start_camera(action, updated_fields,document_id,stop=True)
 
+        elif action["actionName"] == "webhook":
+            trigger_webhook(action, updated_fields)
+
 
 def update_record(action, document_id):
     """
@@ -169,11 +172,11 @@ def start_camera(action, updated_fields,document_id,stop=False):
         tableName = action.get("tableName")
         collection = db[tableName]
 
-        camera_obj_id = current_document.get(action.get('fieldName'))
-        print(camera_obj_id, "--->id")
-        tableDocument = db[tableName].find_one({'_id': ObjectId(camera_obj_id)})
-        print('table-->', camera_obj_id, tableName, tableDocument)
-        cameraUrl = tableDocument.get('cameraUrl')
+        cameraUrl = action.get('fieldName')
+        # print(camera_obj_id, "--->id")
+        # tableDocument = db[tableName].find_one({'_id': ObjectId(camera_obj_id)})
+        # print('table-->', camera_obj_id, tableName, tableDocument)
+        # cameraUrl = tableDocument.get('cameraUrl')
 
         # The camera ID or any other required parameter
         print(cameraUrl)
@@ -194,6 +197,34 @@ def start_camera(action, updated_fields,document_id,stop=False):
             print("Response:", response.text)
     except Exception as e:
         print(f"Error while starting camera: {e}")
+
+
+def trigger_webhook(action, updated_fields):
+    try:
+        webhook_url = action.get('url')
+        headers = action.get('headers', {})
+        body = action.get('body', {})
+        method = action.get('method', 'get').upper()
+
+        # Add updated fields to the body if needed
+        body.update(updated_fields)
+
+        print(f"Triggering webhook: {webhook_url} with headers: {headers} and body: {body}")
+
+        if method == 'POST':
+            response = requests.post(webhook_url, json=body, headers=headers)
+        elif method == 'GET':
+            response = requests.get(webhook_url, headers=headers, params=body)
+
+        # Check response status
+        if response.status_code in [200, 201]:
+            print(f"Webhook triggered successfully: {response.status_code}")
+        else:
+            print(f"Failed to trigger webhook. Status code: {response.status_code}")
+            print("Response:", response.text)
+    except Exception as e:
+        print(f"Error while triggering webhook: {e}")
+
 
 
 def start_watching():

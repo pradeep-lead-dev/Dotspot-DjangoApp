@@ -3,3 +3,4 @@ ReactApp/
 __pycache__/
 migrations/
 models/
+test.py

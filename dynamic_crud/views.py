@@ -16,6 +16,12 @@ client = MongoClient(connection_string)
 db = client[database_name] 
 
 
+
+def isNeeded(data):
+    return not data.get("isDeleted",False)
+
+
+
 # Create your views here.
 @api_view(['GET', 'POST'])
 def getAll(req,collectionName):
@@ -25,9 +31,14 @@ def getAll(req,collectionName):
         data = list(collection.find({}))
         if data :
             for d in data:
+                
                 d['_id'] = str(d['_id'])  # Convert ObjectId to string
-            
-            return Response({'success': True , 'data': data}, status=status.HTTP_200_OK)
+                for field in restricted_fields:
+                    if field in d:
+                        del d[field]
+            finaldata = [d for d in data if  isNeeded(d)]
+
+            return Response({'success': True , 'data': finaldata}, status=status.HTTP_200_OK)
         
         else :
             return Response({"message" : "No Data Found" , "data" : data , "success" : False})
@@ -56,10 +67,11 @@ def specificAction(request , collectionName , param):
         try:
             if query_field:
                 form = collection.find_one({query_field : param})
+                
                 print("use q ", query_field , param)
             else:
                 form = collection.find_one({'_id': ObjectId(param)})
-            if form:
+            if form and isNeeded(form):
                 form['_id'] = str(form['_id'])
                 filtered_fields = []
                 # [field for field in form.get('fields', []) if field['key'] not in restricted_fields]
@@ -102,11 +114,12 @@ def specificAction(request , collectionName , param):
         
     if request.method == "DELETE":
         try:
+            filtered_data={"isDeleted": True}
             if query_field:
-                result = collection.delete_one({query_field: param})
+                result = collection.update_one({query_field: param}, {'$set': filtered_data})
             else:
-                result = collection.delete_one({'_id': ObjectId(param)})
-            if result.deleted_count:
+                result = collection.update_one({'_id': ObjectId(param)}, {'$set': filtered_data})
+            if result:
                 return Response({'success': True , 'message': f'{str(collectionName).capitalize()} deleted'}, status=status.HTTP_200_OK)
             else:
                 return Response({'success': False, 'message': f'{str(collectionName).capitalize()} not found'}, status=status.HTTP_404_NOT_FOUND)
@@ -131,6 +144,11 @@ def get_all_collections(req):
             print(e)
             return Response({'success': False, 'message': str(e).capitalize()}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         
+
+
+
+
+
 
 
 
