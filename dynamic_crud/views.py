@@ -48,6 +48,7 @@ def getAll(req,collectionName):
         dataToPost = req.data
         dataToPost["updated_at"] = datetime.datetime.now()
         dataToPost["created_at"] = datetime.datetime.now()
+        # if dataToPost
 
         try :
             data = collection.insert_one(dataToPost)
