@@ -15,6 +15,7 @@ connection_string = settings.DATABASE_CONNECTION_STRING
 client = MongoClient(connection_string)
 db = client[database_name] 
 
+redis_client = redis.StrictRedis(host='localhost', port=6379, db=0)
 
 
 def isNeeded(data):
@@ -44,19 +45,64 @@ def getAll(req,collectionName):
             return Response({"message" : "No Data Found" , "data" : data , "success" : False})
 
     
-    if req.method == 'POST' :
+    if req.method == 'POST':
         dataToPost = req.data
         dataToPost["updated_at"] = datetime.datetime.now()
         dataToPost["created_at"] = datetime.datetime.now()
 
-        try :
+        try:
+            # Fetch form details and fields
+            forms = db['forms']
+            form = forms.find_one({"tableName": collectionName})
+            fields = form.get('fields')
+            
+            # Look for the autoincrement field
+            autoIncrementfield = {}
+            for field in fields:
+                if field.get('type') == "autoincrement":
+                    autoIncrementfield = field
+            
+            if autoIncrementfield:
+                # If autoincrement field is found, apply locking mechanism
+                prefix = autoIncrementfield.get('prefixForAutoIncrement')
+                field_name = autoIncrementfield.get('key')
+
+                # Acquire Redis lock (to ensure unique entry numbers across concurrent requests)
+                lock_key = f"lock:{collectionName}"
+                lock_acquired = redis_client.setnx(lock_key, "1")
+                
+                if lock_acquired:
+                    try:
+                        # Set lock expiry to prevent deadlock
+                        redis_client.expire(lock_key, 5)  # Lock for 5 seconds
+
+                        # Fetch the current max entry_number
+                        max_entry = collection.find_one({}, sort=[('entry_number', -1)])  # Sort by entry_number in descending order
+                        if max_entry and 'entry_number' in max_entry:
+                            dataToPost['entry_number'] = max_entry['entry_number'] + 1
+                        else:
+                            dataToPost['entry_number'] = 1
+
+                        # Create the autoincrement field with prefix and new entry_number
+                        dataToPost[field_name] = prefix + str(dataToPost['entry_number'])
+                        print(f"{prefix} --- {field_name} --- {prefix + str(dataToPost['entry_number'])}")
+                    
+                    finally:
+                        # Release the Redis lock after processing
+                        redis_client.delete(lock_key)
+                else:
+                    # If lock not acquired, return a failure response
+                    return Response({"message": "Resource is locked, please try again", "success": False}, status=400)
+            
+            # Insert the document into the collection
             data = collection.insert_one(dataToPost)
-        
-            return Response({"message" : f"{str(collectionName).capitalize()} created Successfully" ,"success" : True },status=201)
+            print("\n\n post data \n", dataToPost)
+
+            return Response({"message": f"{str(collectionName).capitalize()} created Successfully", "success": True}, status=201)
+
         except Exception as e:
             print(e)
-            return Response({"message" : "Request Unsuccessful" ,"success" : False },status=400)
-
+            return Response({"message": "Request Unsuccessful", "success": False}, status=400)
 
 @api_view(['GET','PUT','DELETE'])
 def specificAction(request , collectionName , param):
