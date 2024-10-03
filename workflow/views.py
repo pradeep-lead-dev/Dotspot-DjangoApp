@@ -170,16 +170,17 @@ def start_camera(action, updated_fields,document_id,stop=False):
         if stop :
             api_url = "http://localhost:8000/api/dashboard/stop-camera"  # The API endpoint URL from the JSON
         tableName = action.get("tableName")
+        fieldName = action.get("fieldName")
         collection = db[tableName]
 
-        cameraUrl = action.get('fieldName')
+        cameraUrl = updated_fields.get(fieldName)
         # print(camera_obj_id, "--->id")
         # tableDocument = db[tableName].find_one({'_id': ObjectId(camera_obj_id)})
         # print('table-->', camera_obj_id, tableName, tableDocument)
         # cameraUrl = tableDocument.get('cameraUrl')
 
         # The camera ID or any other required parameter
-        print(cameraUrl)
+        print(cameraUrl, document_id)
 
         if not cameraUrl:
             print("No API URL provided for camera action.")

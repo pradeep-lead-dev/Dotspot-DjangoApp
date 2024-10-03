@@ -356,7 +356,7 @@ def process_video(camera_url):
 @api_view(['POST'])
 def start_camera(request):
     global camera_urls, processing_threads, processing_flags , camera_storage_ids
-
+    print("------------> processing flag",processing_flags)
     camera_url = request.data.get('camera_url')
     obj_id = request.data.get('id')
     print(obj_id , camera_url)
