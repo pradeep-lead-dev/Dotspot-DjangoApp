@@ -17,7 +17,7 @@ connection_string = settings.DATABASE_CONNECTION_STRING
 client = MongoClient(connection_string)
 db = client[database_name] 
 # Connect to a specific collection
-collection = db['user']  # Replace with your collection name
+collection = db['users']  # Replace with your collection name
 
 # Create your views here.
 
@@ -75,8 +75,9 @@ def generate_jwt_token(user):
     
     payload = {
         'user_id': str(user.get("_id")),  # Use string for MongoDB ObjectId
-        'username': user.get("name"),
+        'username': user.get("userName"),
         'permissions':finalPermissions,
+        "roles":roles ,
         'exp': datetime.utcnow() + timedelta(days=1),  # Expiration time
         'iat': datetime.utcnow()  # Issued at time
     }
@@ -166,8 +167,8 @@ def register(req):
     if d :
         return Response({"message" : "User Email Already Exists" , "success" : False},status= 400)
 
-    if name and password and email and role :
-        data = {"name" : name , "password" : encrypt (password) , "email" : email ,"roles" : role , "permissions":permission}
+    if name and password and email  :
+        data = {"userName" : name , "password" : encrypt (password) , "email" : email ,"roles" : role , "permissions":permission}
         d = collection.insert_one(data)
     else :
         return Response({"message" : "Bad Request" , "success" : False},status= 400)

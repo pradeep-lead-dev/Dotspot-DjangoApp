@@ -22,4 +22,5 @@ urlpatterns = [
     path('api/dashboard', include('dashboard.urls')),
     path('api/user-auth', include('user_auth.urls')),
     path('api/data', include('dynamic_crud.urls')),
+    path('api/notify', include('notification.urls')),
 ]

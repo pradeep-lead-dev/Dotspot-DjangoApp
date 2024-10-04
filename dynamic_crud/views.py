@@ -54,26 +54,27 @@ def getAll(req,collectionName):
         try :
             forms = db['forms']
             form = forms.find_one({"tableName" : collectionName})
-            fields = form.get('fields')
-            print(fields)
-            autoIncrementfield = {}
-            for field in fields:
-                if field.get('type') == "autoincrement":
-                    autoIncrementfield = field
-            print("\n\n",autoIncrementfield) 
+            if form:
+                fields = form.get('fields')
+                print(fields)
+                autoIncrementfield = {}
+                for field in fields:
+                    if field.get('type') == "autoincrement":
+                        autoIncrementfield = field
+                print("\n\n",autoIncrementfield) 
 
-            if autoIncrementfield:
-                prefix = autoIncrementfield.get('prefixForAutoIncrement')
-                field_name = autoIncrementfield.get('key')
+                if autoIncrementfield:
+                    prefix = autoIncrementfield.get('prefixForAutoIncrement')
+                    field_name = autoIncrementfield.get('key')
 
 
-                max_entry = collection.find_one({}, sort=[('entry_number', -1)])  # Sort by entry_number in descending order
-                if max_entry and 'entry_number' in max_entry:
-                    dataToPost['entry_number'] = max_entry['entry_number'] + 1
-                else:
-                    dataToPost['entry_number'] = 1 
-                dataToPost[field_name] = prefix + str(dataToPost['entry_number'])
-                print(f"{prefix} --- {field_name}   --{ prefix + str(dataToPost['entry_number'])} ")
+                    max_entry = collection.find_one({}, sort=[('entry_number', -1)])  # Sort by entry_number in descending order
+                    if max_entry and 'entry_number' in max_entry:
+                        dataToPost['entry_number'] = max_entry['entry_number'] + 1
+                    else:
+                        dataToPost['entry_number'] = 1 
+                    dataToPost[field_name] = prefix + str(dataToPost['entry_number'])
+                    print(f"{prefix} --- {field_name}   --{ prefix + str(dataToPost['entry_number'])} ")
             data = collection.insert_one(dataToPost)
             print("\n\n post data \n ",dataToPost)
 

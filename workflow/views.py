@@ -5,7 +5,7 @@ import threading
 import subprocess
 import requests
 from bson.objectid import ObjectId
-
+from datetime import datetime
 
 # Connect to MongoDB
 database_name = settings.DATABASE_NAME
@@ -84,7 +84,7 @@ def trigger_automation(current_collection_name, document_id, updated_fields):
         print(f"In loop: {trigger['tableName']} == {current_collection_name}")
         
         if trigger["tableName"] == current_collection_name and evaluate_condition(trigger, updated_fields):
-            execute_actions(automation["actions"], document_id, updated_fields)
+            execute_actions(automation["actions"], document_id, updated_fields,current_collection_name)
 
 
 def evaluate_condition(trigger, updated_fields):
@@ -131,7 +131,7 @@ def evaluate_single_condition(condition, updated_fields):
     return False
 
 
-def execute_actions(actions, document_id, updated_fields):
+def execute_actions(actions, document_id, updated_fields,current_collection_name):
     """
     Executes actions like 'updaterecord' and 'startcamera' based on the automation config.
     """
@@ -147,7 +147,7 @@ def execute_actions(actions, document_id, updated_fields):
             start_camera(action, updated_fields,document_id,stop=True)
 
         elif action["actionName"] == "webhook":
-            trigger_webhook(action, updated_fields)
+            trigger_webhook(action, updated_fields,current_collection_name,document_id)
 
 
 def update_record(action, document_id):
@@ -199,17 +199,25 @@ def start_camera(action, updated_fields,document_id,stop=False):
     except Exception as e:
         print(f"Error while starting camera: {e}")
 
-
-def trigger_webhook(action, updated_fields):
+def trigger_webhook(action, updated_fields, current_collection_name, document_id):
     try:
         webhook_url = action.get('url')
-        headers = action.get('headers', {})
-        body = action.get('body', {})
+        headers = dict(action.get('headers', {}))
+        body = dict(action.get('body', {}))
+        print(action, type(body))
         method = action.get('method', 'get').upper()
-
-        # Add updated fields to the body if needed
+        body["id"] = str(document_id)
+        body["tableName"] = current_collection_name
+        
+        # Convert datetime objects to string (ISO format) if they exist
+        for key, value in updated_fields.items():
+            if isinstance(value, datetime):
+                updated_fields[key] = value.isoformat()
+        
+        # Add updated fields to the body
         body.update(updated_fields)
-
+        
+        print("\n\n", body)
         print(f"Triggering webhook: {webhook_url} with headers: {headers} and body: {body}")
 
         if method == 'POST':
@@ -222,11 +230,9 @@ def trigger_webhook(action, updated_fields):
             print(f"Webhook triggered successfully: {response.status_code}")
         else:
             print(f"Failed to trigger webhook. Status code: {response.status_code}")
-            print("Response:", response.text)
+            # print("Response:", response.text)
     except Exception as e:
         print(f"Error while triggering webhook: {e}")
-
-
 
 def start_watching():
     """

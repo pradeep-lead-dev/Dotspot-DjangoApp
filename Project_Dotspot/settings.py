@@ -44,6 +44,7 @@ INSTALLED_APPS = [
     'dynamic_crud',
     "permissions",
     "workflow",
+    "notification",
 ]
 
 MIDDLEWARE = [
@@ -192,4 +193,10 @@ DATABASE_NAME = "podaran"
 DATABASE_CONNECTION_STRING = "mongodb+srv://dotspot:D0ts1t012345!@dotspot.el4d0.mongodb.net/?retryWrites=true&w=majority&appName=Dotspot"
 
 
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = 'expressmail.provider@gmail.com'  # Replace with your email
+EMAIL_HOST_PASSWORD = 'rggscuaxizlzakuk'  # Replace with your email password
 
