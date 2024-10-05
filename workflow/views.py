@@ -175,9 +175,10 @@ def start_camera(action, updated_fields,document_id,stop=False):
         fieldName = action.get("fieldName")
         collection = db[tableName]
 
+        print("inside the startcamera func")
         previous = updated_fields.get('previous')
-        print("previous Data",previous.get(fieldName))
-        running_camera  = previous.get(fieldName)
+        # print("previous Data",previous.get(fieldName))
+        # running_camera  = previous.get(fieldName)
         cameraUrl = updated_fields.get(fieldName)
         # stop the previous camera by request
         # if not stop and running_camera:
@@ -211,11 +212,11 @@ def start_camera(action, updated_fields,document_id,stop=False):
 
         # Check if the request was successful
         if response.status_code == 200:
-            print(response.text)
+            # print(response.text)
             print(f"Camera {cameraUrl} action successful.")
         else:
             print(f"Failed to perform  camera {cameraUrl}. Status code: {response.status_code}")
-            print("Response:", response.text)
+            # print("Response:", response.text)
     except Exception as e:
         print(f"Error while starting camera: {e}")
 
@@ -252,7 +253,7 @@ def trigger_webhook(action, updated_fields, current_collection_name, document_id
             print(f"Failed to trigger webhook. Status code: {response.status_code}")
             # print("Response:", response.text)
     except Exception as e:
-        print(f"Error while triggering webhook: {e}")
+        print(f"Error while triggering webhook:")
 
 def start_watching():
     """

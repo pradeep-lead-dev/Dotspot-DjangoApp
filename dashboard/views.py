@@ -370,13 +370,13 @@ def start_camera(request):
     if camera_url not in camera_urls:
         return Response({'error': 'Camera Not Authorized URL provided'}, status=400)
     master_collection = db['master'] 
-    master_collection.find_one({"_id" : ObjectId(camera_storage_ids[camera_url])})
-    previous_data = master_collection.get('previous') 
-    if master_collection and previous_data  :
+    master_data = master_collection.find_one({"_id" : ObjectId(camera_storage_ids[camera_url])})
+    previous_data = master_data.get('previous') 
+    if master_data and previous_data  :
         if previous_data and previous_data.get("camera"):
             previous_camera = previous_data.get("camera")
             stop_camera_function(previous_camera)
-        master_collection.get('previous')
+        # master_collection.get('previous')
     if not processing_flags.get(camera_url, False):
         processing_flags[camera_url] = True
         frame_queues[camera_url] = Queue(maxsize=10)
