@@ -6,7 +6,7 @@ import subprocess
 import requests
 from bson.objectid import ObjectId
 from datetime import datetime
-
+import json
 # Connect to MongoDB
 database_name = settings.DATABASE_NAME
 connection_string = settings.DATABASE_CONNECTION_STRING
@@ -220,6 +220,12 @@ def start_camera(action, updated_fields,document_id,stop=False):
     except Exception as e:
         print(f"Error while starting camera: {e}")
 
+def json_serial(obj):
+    """JSON serializer for objects not serializable by default."""
+    if isinstance(obj, datetime):
+        return obj.isoformat()  # Convert datetime to string in ISO format
+    raise TypeError(f"Type {type(obj)} not serializable")
+
 def trigger_webhook(action, updated_fields, current_collection_name, document_id):
     try:
         webhook_url = action.get('url')
@@ -242,7 +248,9 @@ def trigger_webhook(action, updated_fields, current_collection_name, document_id
         print(f"Triggering webhook: {webhook_url} with headers: {headers} and body: {body}")
 
         if method == 'POST':
-            response = requests.post(webhook_url, json=body, headers=headers)
+            # response = requests.post(webhook_url, json=body, headers=headers)
+            response = requests.post(webhook_url, json=json.loads(json.dumps(body, default=json_serial)), headers=headers)
+
         elif method == 'GET':
             response = requests.get(webhook_url, headers=headers, params=body)
 
@@ -253,7 +261,7 @@ def trigger_webhook(action, updated_fields, current_collection_name, document_id
             print(f"Failed to trigger webhook. Status code: {response.status_code}")
             # print("Response:", response.text)
     except Exception as e:
-        print(f"Error while triggering webhook:")
+        print(f"Error while triggering webhook:{e}")
 
 def start_watching():
     """

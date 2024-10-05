@@ -189,15 +189,16 @@ def get_contacts(id):
     contacts = list(contact_collection.find({"sendLoadUpdate" : True}))
 
     for contact in contacts:
-        roleName = contact.get('roles')[0]
-        print(contact.get('roles')[0])
+        roleName = contact.get('roles')
+        print("roles",contact.get('roles'))
         if roleName :
             role = role_collection.find_one({"roleName" : roleName})
+            print("roleTable" , role)
             message_template = role.get('messageTemplate')
             if message_template:
                 print('message template\n\n' , message_template)
                 contact['messageTemplate'] = template_to_msg( message_template , id )
-                
+    print(contacts , "---------contact----------->")
 
     return contacts
 
@@ -225,5 +226,5 @@ def trigger(request):
                 
     return Response({'req': data}, status=200)
 
-get_contacts(id="66fd0653817940580f1599fc")
+# get_contacts(id="66fd0653817940580f1599fc")
 # send_email_function(subject="Order Id Update" ,message= "hiii" ,to_field= 'sabarinathan3011@gmail.com')

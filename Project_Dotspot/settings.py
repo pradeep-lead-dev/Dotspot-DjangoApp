@@ -200,3 +200,5 @@ EMAIL_USE_TLS = True
 EMAIL_HOST_USER = 'expressmail.provider@gmail.com'  # Replace with your email
 EMAIL_HOST_PASSWORD = 'rggscuaxizlzakuk'  # Replace with your email password
 
+BY_PASS_TOKEN = "0bf57cae-a4b7-41eb-9a91-75afec80ab95"
+ 

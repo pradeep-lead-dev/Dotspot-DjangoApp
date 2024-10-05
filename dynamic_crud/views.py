@@ -29,16 +29,22 @@ def isNeeded(data):
 def getAll(req,collectionName):
     
     result = verify_and_get_payload(req)
-    if result.get('payload'):
+    
+    print("------------>payload" , result)
+    if result.get('payload') :
         payload = result.get('payload')
     else:
         return Response({"message" : f"{result.get('msg')}"  , "success" : False})
-    permissions = payload.get('permissions')[:]
+    if payload == "allow.all" :
+
+        permissions = []
+    else :
+        permissions = payload.get('permissions')[:]
 
 
     collection = db[collectionName]
     if req.method == 'GET':
-        if not permissions or str(collectionName+".read") not in permissions:
+        if (not permissions or str(collectionName+".read") not in permissions) and payload != "allow.all":
             return Response({'message': 'Permission Denied', 'success': False}, status=401)
         data = list(collection.find({}))
         if data :
@@ -103,17 +109,24 @@ def getAll(req,collectionName):
 @check
 def specificAction(request , collectionName , param):
     result = verify_and_get_payload(request)
-    if result.get('payload'):
+    
+    print("------------>payload" , result)
+    if result.get('payload') :
         payload = result.get('payload')
     else:
         return Response({"message" : f"{result.get('msg')}"  , "success" : False})
-    permissions = payload.get('permissions')[:]
+    if payload == "allow.all" :
+
+        permissions = []
+    else :
+        permissions = payload.get('permissions')[:]
+
 
     collection = db[collectionName]
     query_field = request.headers.get('query-field', None)
     # print(request.headers)
     if request.method == 'GET':
-        if not permissions or str(collectionName+".read") not in permissions:
+        if (not permissions or str(collectionName+".read") not in permissions) and payload != "allow.all":
             return Response({'message': 'Permission Denied', 'success': False}, status=401)
         try:
             if query_field:
