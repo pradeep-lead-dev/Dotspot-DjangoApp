@@ -95,7 +95,7 @@ def send_email_function(subject , message , to_field):
 
 
 def send_whatsapp_message(number, message):
-    url = "https://dotsapp-om71.onrender.com/send-message"
+    url = "http://localhost:3000/send-message"
     payload = {
         "number": number,
         "message": message
@@ -128,58 +128,59 @@ def send_multiple_whatsapp_message(number, message):
         return {"error": str(e)}
 
 
-# Example usage
-# result = send_whatsapp_message("918220018259", "hiii brooo")   
-
-def template_to_msg(id="66fd0653817940580f1599fc"):
-    # Template string with placeholders
-    text = '--------------------------------------------------------------\n| {{master.orderId}} |\n| {{master.packageData}} |\n| {{master.totalPackage}} |'
-    
+def template_to_msg(message_template, id="66fd0653817940580f1599fc"):
     # Find all placeholders inside {{ }}
-    msg = re.findall(r'{{(.*?)}}', text)
-
+    message_template = "{{master.vehicleNumber}} ,  {{master.packageData}}"
+    msg = re.findall(r'{{(.*?)}}', message_template)
+    
     # Dictionary to store replacement values
     replace_text = {}
-
+    
     # Loop through each placeholder and fetch its corresponding data from the database
     for txt in msg:
-        tablename, field = txt.split('.')
-        collection = db[tablename]
+        keys = txt.split('.')
+        tablename = keys[0]
+        field_path = keys[1:]
+
+        # Fetch the data from the appropriate collection
+        collection = db[tablename]  # Replace `db` with your actual MongoDB connection
         data_from_db = collection.find_one({"_id": ObjectId(id)})
-        
+
+        # Follow the field path dynamically
         if data_from_db:
-            replace_text[txt] = data_from_db.get(field, "No Data")
+            value = data_from_db
+            for field in field_path:
+                if field in value:
+                    value = value[field]
+                else:
+                    value = None
+                    break
 
-    # Initialize a list to store the final table lines
-    table_lines = []
-    
-    # Create table header
-    header = f"| {'SpotId'.ljust(30)} | {'Value'.ljust(30)} |"
-    table_lines.append("--------------------------------------------------------------")
-    table_lines.append(header)
-    table_lines.append("--------------------------------------------------------------")
-
-    for key, value in replace_text.items():
-        if isinstance(value, list):
-            # For lists (like packageData), create multiple rows
-            for item in value:
-                variant = item.get('variant', 'N/A')
-                actual_count = item.get('actualCount', 'N/A')
-                table_lines.append(f"| {variant.ljust(30)} | actual count: {str(actual_count).ljust(30)} |")
+            # Check if the field_path points to a list (like packageData)
+            if isinstance(value, list):
+                if field_path[-1] == 'actualCount':
+                    # If looking for actualCount, gather it from each item in packageData
+                    actual_counts = [item['actualCount'] for item in value if isinstance(item, dict) and 'actualCount' in item]
+                    replace_text[txt] = "\n".join(map(str, actual_counts)) if actual_counts else "N/A"
+                else:
+                    # Handle lists by formatting the individual items if not looking for actualCount
+                    formatted_list = "\n".join(
+                        [f"{item['variant']}: Target {item['targetCount']}, Actual {item['actualCount']}" for item in value if isinstance(item, dict)]
+                    )
+                    replace_text[txt] = formatted_list if formatted_list else "N/A"
+            else:
+                replace_text[txt] = value if value is not None else "N/A"  # Set to "N/A" if None
         else:
-            # For single fields like orderId or totalPackage, create a simple row
-            field_name = key.split('.')[-1]
-            table_lines.append(f"| {field_name.ljust(30)} | {str(value).ljust(30)} |")
+            replace_text[txt] = "N/A"  # Set to "N/A" if the document is not found
 
-    # Add the final closing line of the table
-    table_lines.append("--------------------------------------------------------------")
+    # Replace the placeholders in the template with the formatted values
+    for placeholder, value in replace_text.items():
+        message_template = message_template.replace(f"{{{{{placeholder}}}}}", str(value))
 
-    # Join all lines into a final formatted string
-    final_table = '\n'.join(table_lines)
+    print("Final Message:\n", message_template)
+    # Return the final formatted message
+    return message_template
 
-    # Return or print the final converted string
-    print("Converted Template:\n", final_table)
-    return final_table
 
 
 def get_contacts(id):
@@ -194,7 +195,9 @@ def get_contacts(id):
             role = role_collection.find_one({"roleName" : roleName})
             message_template = role.get('messageTemplate')
             if message_template:
-                contact['messageTemplate'] = template_to_msg( id)
+                print('message template\n\n' , message_template)
+                contact['messageTemplate'] = template_to_msg( message_template , id )
+                
 
     return contacts
 
@@ -214,8 +217,11 @@ def trigger(request):
             whatsapp = str(contact.get('whatsapp')).replace("+","")
             if len(whatsapp)==10 :
                 whatsapp = "91" + whatsapp
+                send_whatsapp_message(whatsapp , message)
             elif len(whatsapp)==12 :
                 send_whatsapp_message(whatsapp , message)
+            else:
+                print("In valid Whatsapp Number Format")
                 
     return Response({'req': data}, status=200)
 

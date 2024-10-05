@@ -359,6 +359,7 @@ def start_camera(request):
     print("------------> processing flag",processing_flags)
     camera_url = request.data.get('camera_url')
     obj_id = request.data.get('id')
+
     print(obj_id , camera_url)
     if not obj_id:
         return Response({'error': 'No camera Storage Id provided'}, status=400)
@@ -367,8 +368,15 @@ def start_camera(request):
     camera_storage_ids[camera_url] = obj_id
 
     if camera_url not in camera_urls:
-        camera_urls.append(camera_url)
-
+        return Response({'error': 'Camera Not Authorized URL provided'}, status=400)
+    master_collection = db['master'] 
+    master_collection.find_one({"_id" : ObjectId(camera_storage_ids[camera_url])})
+    previous_data = master_collection.get('previous') 
+    if master_collection and previous_data  :
+        if previous_data and previous_data.get("camera"):
+            previous_camera = previous_data.get("camera")
+            stop_camera_function(previous_camera)
+        master_collection.get('previous')
     if not processing_flags.get(camera_url, False):
         processing_flags[camera_url] = True
         frame_queues[camera_url] = Queue(maxsize=10)
@@ -400,6 +408,23 @@ def stop_camera(request):
     return Response({'message': f'Camera {camera_url} was not running'})
 
 
+
+def stop_camera_function(camera_url):
+    global processing_flags, processing_threads
+
+    if not camera_url:
+        print({'error': 'No camera URL provided'}, status=400)
+        return 
+    if processing_flags.get(camera_url, False):
+        processing_flags[camera_url] = False
+        # Ensure data is saved before stopping
+        create_new_item_from_updates(camera_url)
+        reinitialize_counter(camera_url)
+        if processing_threads.get(camera_url):
+            processing_threads[camera_url].join()  # Wait for the thread to finish
+            print({'message': f'Camera {camera_url} stopped and data saved'})
+
+    print({'message': f'Camera {camera_url} was not running'})
 
 
 

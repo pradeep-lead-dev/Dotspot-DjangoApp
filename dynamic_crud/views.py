@@ -1,11 +1,12 @@
 from django.shortcuts import render 
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view 
 from rest_framework.response import Response
 from pymongo import MongoClient
 from rest_framework import status
 from bson.objectid import ObjectId
 from django.conf import settings
 import datetime
+from user_auth.views import check , verify_jwt_token , verify_and_get_payload# Import from the separate decorators file
 
 restricted_fields  = settings.SENSITIVE_COLUMN
 non_editable_fields = settings.NON_EDITABLE_COLUMN
@@ -24,10 +25,21 @@ def isNeeded(data):
 
 # Create your views here.
 @api_view(['GET', 'POST'])
+@check
 def getAll(req,collectionName):
-    print(req.build_absolute_uri())
+    
+    result = verify_and_get_payload(req)
+    if result.get('payload'):
+        payload = result.get('payload')
+    else:
+        return Response({"message" : f"{result.get('msg')}"  , "success" : False})
+    permissions = payload.get('permissions')[:]
+
+
     collection = db[collectionName]
     if req.method == 'GET':
+        if not permissions or str(collectionName+".read") not in permissions:
+            return Response({'message': 'Permission Denied', 'success': False}, status=401)
         data = list(collection.find({}))
         if data :
             for d in data:
@@ -46,6 +58,8 @@ def getAll(req,collectionName):
     
       
     if req.method == 'POST' :
+        if not permissions or str(collectionName+".create") not in permissions:
+            return Response({'message': 'Permission Denied', 'success': False}, status=401)
         dataToPost = req.data
         dataToPost["updated_at"] = datetime.datetime.now()
         dataToPost["created_at"] = datetime.datetime.now()
@@ -86,11 +100,21 @@ def getAll(req,collectionName):
 
 
 @api_view(['GET','PUT','DELETE'])
+@check
 def specificAction(request , collectionName , param):
+    result = verify_and_get_payload(request)
+    if result.get('payload'):
+        payload = result.get('payload')
+    else:
+        return Response({"message" : f"{result.get('msg')}"  , "success" : False})
+    permissions = payload.get('permissions')[:]
+
     collection = db[collectionName]
     query_field = request.headers.get('query-field', None)
     # print(request.headers)
     if request.method == 'GET':
+        if not permissions or str(collectionName+".read") not in permissions:
+            return Response({'message': 'Permission Denied', 'success': False}, status=401)
         try:
             if query_field:
                 form = collection.find_one({query_field : param})
@@ -118,7 +142,8 @@ def specificAction(request , collectionName , param):
             return Response({'success': False , 'message': str(e).capitalize()}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     if request.method == "PUT":
-
+        if not permissions or str(collectionName+".update") not in permissions:
+            return Response({'message': 'Permission Denied', 'success': False}, status=401)
         try:
             
             updated_data = request.data  # Get the data from the requestuest body
@@ -128,8 +153,21 @@ def specificAction(request , collectionName , param):
                     filtered_data[field] = updated_data[field]  
             filtered_data["updated_at"] = datetime.datetime.now()
             if query_field:
+                previous_data = dict(collection.find_one({query_field : param}))
+                if previous_data :
+                    previous_data.pop("_id")
+                    if previous_data.get('previous'):
+                        previous_data.pop('previous')
+                filtered_data['previous'] = previous_data
                 result = collection.update_one({query_field: param}, {'$set': filtered_data})
             else:
+                previous_data = collection.find_one({'_id': ObjectId(param)})
+                if previous_data :
+                    previous_data.pop("_id")
+                    if previous_data.get('previous'):
+                        previous_data.pop('previous')
+
+                filtered_data['previous'] = previous_data
                 result = collection.update_one({'_id': ObjectId(param)}, {'$set': filtered_data})
             if result.matched_count:
                 return Response({'success': True, 'message': f'{str(collectionName).capitalize()} updated'}, status=status.HTTP_200_OK)
@@ -140,6 +178,8 @@ def specificAction(request , collectionName , param):
             return Response({'success': False, 'message': str(e).capitalize()}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         
     if request.method == "DELETE":
+        if not permissions or str(collectionName+".delete") not in permissions:
+            return Response({'message': 'Permission Denied', 'success': False}, status=401)
         try:
             filtered_data={"isDeleted": True}
             if query_field:

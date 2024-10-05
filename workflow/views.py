@@ -23,6 +23,7 @@ automations_collection = db["workflow"]
 def watch_changes():
     with db.watch() as stream:
         for change in stream:
+
             print("Change detected:", change)
             process_trigger(change)
 
@@ -45,8 +46,9 @@ def process_trigger(change):
         # Handle update operation and retrieve updated fields
         updated_fields = change.get("updateDescription", {}).get("updatedFields", {})
         print(f"Update detected in {current_collection_name} --> Updated fields: {updated_fields}")
-        
+        previous_document = change.get("fullDocumentBeforeChange")
         if updated_fields:
+            
             # Fetch the latest version of the document
             current_document = db[current_collection_name].find_one({"_id": ObjectId(document_id)})
             
@@ -173,13 +175,31 @@ def start_camera(action, updated_fields,document_id,stop=False):
         fieldName = action.get("fieldName")
         collection = db[tableName]
 
+        previous = updated_fields.get('previous')
+        print("previous Data",previous.get(fieldName))
+        running_camera  = previous.get(fieldName)
         cameraUrl = updated_fields.get(fieldName)
+        # stop the previous camera by request
+        # if not stop and running_camera:
+        #     stop_url = "http://localhost:8000/api/dashboard/stop-camera"
+        #     response = requests.post(api_url, json={"camera_url": cameraUrl,"id":str(document_id) })
+
+        # # Check if the request was successful
+        #     if response.status_code == 200:
+        #         print(response.text)
+        #         print(f"Camera {cameraUrl} action successful.")
+        #     else:
+        #         print(f"Failed to perform  camera {cameraUrl}. Status code: {response.status_code}")
+        #         print("Response:", response.text)
+
+
         # print(camera_obj_id, "--->id")
         # tableDocument = db[tableName].find_one({'_id': ObjectId(camera_obj_id)})
         # print('table-->', camera_obj_id, tableName, tableDocument)
         # cameraUrl = tableDocument.get('cameraUrl')
 
         # The camera ID or any other required parameter
+        # print()
         print(cameraUrl, document_id)
 
         if not cameraUrl:
