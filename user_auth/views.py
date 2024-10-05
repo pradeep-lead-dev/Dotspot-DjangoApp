@@ -85,7 +85,6 @@ def generate_jwt_token(user):
     return token
 
 
-
 @api_view(['POST'])
 def login(req):
     print(req.data,"-------------")

@@ -217,6 +217,12 @@ def update_existing_with_data(existing_data, data_to_push):
     return sorted_data
 
 
+
+
+
+
+
+
 # Create a new report from updates
 def create_new_item_from_updates(camera_url):
     collection = db['master']
@@ -253,7 +259,9 @@ def create_new_item_from_updates(camera_url):
 
         print("data--->",data_to_push ,"\n\n", existingPackageData[camera_url].get("packageData") )
         uploadPackageData[camera_url] = update_existing_with_data(existingPackageData[camera_url].get("packageData",{}), data_to_push)
-        
+        camera_id = cameradetails[camera_url].get("cameraId")
+
+
         print("temp --->")
         final_data = {
             "startTime": start_time[camera_url],
@@ -263,8 +271,52 @@ def create_new_item_from_updates(camera_url):
             "packageData" : uploadPackageData[camera_url]
         }
 
+
+        if "ConveyorSplit" in existingPackageData[camera_url]:
+        # Fetch the existing conveyor split data
+            conveyor_split = existingPackageData["ConveyorSplit"]
+
+            # Update the conveyor data for the specific camera/conveyor
+            conveyor_split[f"{camera_id}"] = {
+                "startTime": start_time[camera_url],
+                "endTime": last_entry_time[camera_url],
+                "totalCount": total_count,
+                "duration": duration,
+                "conveyor": uploadPackageData[camera_url]
+            }
+
+        # Push the updated ConveyorSplit back to the document
+            db.collection.update_one(
+                {"_id": ObjectId(camera_storage_ids[camera_url])},
+                {"$set": {"ConveyorSplit": conveyor_split}}
+            )
+        else:
+            # If ConveyorSplit doesn't exist, create it
+            new_conveyor_split = {
+                f"{camera_id}": {
+                    "startTime": start_time[camera_url],
+                    "endTime": last_entry_time[camera_url],
+                    "totalCount": total_count,
+                    "duration": duration,
+                    "conveyor": uploadPackageData[camera_url]
+                }
+            }
+
+
+            # Update the document with the new ConveyorSplit
+            collection.update_one(
+                {"_id": ObjectId(camera_storage_ids[camera_url])},
+                {"$set": {"ConveyorSplit": new_conveyor_split}}
+            )
+
+
+
+
+
         # Simulating DB insertion
-        collection.update_one({"_id" : ObjectId(camera_storage_ids[camera_url])  } , {"$set":final_data }, upsert=True )
+        # collection.update_one({"_id" : ObjectId(camera_storage_ids[camera_url])  } , {"$set":final_data }, upsert=True )
+
+        
         print(f"updated new report")
         last_entry_time[camera_url] = current_time
         return {'message': 'Report updated successfully successfully'}
