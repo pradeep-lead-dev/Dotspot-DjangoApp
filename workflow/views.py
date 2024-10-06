@@ -59,7 +59,8 @@ def process_trigger(change):
         # Handle insert operation
         current_document = change.get("fullDocument", {})
         print(f"Insert detected in {current_collection_name} --> Document: {current_document}")
-        
+        print(current_collection_name, current_document.get("_id"), current_document)
+        trigger_automation(current_collection_name, current_document.get("_id"), current_document)
         # You can implement any logic to handle insert events if needed
         # For example, triggering automations based on insertions
     

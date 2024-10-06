@@ -121,7 +121,7 @@ def get_camera_details():
 
 get_camera_details()
 print("cam details ---->",cameradetails)
-
+# cameradetails[]
 # Initialize video capture
 def initialize_video_capture(url):
     cap = cv2.VideoCapture(url, cv2.CAP_FFMPEG)
@@ -219,6 +219,55 @@ def update_existing_with_data(existing_data, data_to_push):
 
 
 
+def update_package_data(conveyor_split, package_data,targetPackage = 100):
+    # Convert package_data to a dict for easier updating, using 'variant' as key
+    print("temp verify",conveyor_split, package_data,targetPackage = 100)
+
+    package_data_dict = {item['variant']: item for item in package_data}
+    max_key = max(item['key'] for item in package_data)  # Find max key for new entries
+    totalCount=0
+    for i in package_data:
+        i['actualCount'] = 0
+        print(i)
+
+    print(f'\n {package_data}\n')
+    
+    summary = f"Target count : {targetPackage}\n"
+
+    for split_key, split_value in conveyor_split.items():
+        totalCount += split_value['totalCount']
+        summary += f"{split_key} - {split_value['totalCount']} \n"
+        for package in split_value['packageCount']:
+            variant = package['variant']
+            actual_count = package['actualCount']
+            
+            # If the variant already exists in package_data, update the actualCount
+            if variant in package_data_dict:
+                package_data_dict[variant]['actualCount'] += actual_count
+            else:
+                # If the variant does not exist, create a new entry with the next key
+                max_key += 1
+                package_data_dict[variant] = {
+                    'key': max_key,
+                    'variant': variant,
+                    'targetCount': package['targetCount'],
+                    'actualCount': actual_count
+                }
+    summary += f"Actual Count - {totalCount}\n"
+    summary += str("-"*15 +"\n")
+    summary += f"Balance  - {targetPackage - totalCount}\n"
+
+    print(totalCount)
+    print(summary)
+
+    transformed_data = {
+        "packageData" : list(package_data_dict.values()) ,
+        "totalCount" : totalCount ,
+        "summary" : summary
+    }
+    # Convert back to list
+    return transformed_data
+
 
 
 
@@ -253,13 +302,17 @@ def create_new_item_from_updates(camera_url):
                 
         data_to_push = {}
         for key, value in update_data.items():
-            data_to_push[key] = value
+            new_key = str(key).replace('_count', '')
+            data_to_push[new_key] = value
 
         existingPackageData[camera_url] = collection.find_one({"_id" : ObjectId(camera_storage_ids[camera_url])})
 
-        print("data--->",data_to_push ,"\n\n", existingPackageData[camera_url].get("packageData") )
         uploadPackageData[camera_url] = update_existing_with_data(existingPackageData[camera_url].get("packageData",{}), data_to_push)
-        camera_id = cameradetails[camera_url].get("cameraId")
+        print("data---> id ",camera_storage_ids,data_to_push ,"\n\n", uploadPackageData[camera_url])
+        if  cameradetails.get(camera_url) :
+            camera_id = cameradetails[camera_url].get("cameraId","camId")
+        else :
+            camera_id = "test1"
 
 
         print("temp --->")
@@ -270,11 +323,11 @@ def create_new_item_from_updates(camera_url):
             "duration": duration,
             "packageData" : uploadPackageData[camera_url]
         }
-
+        print("existing data-->",existingPackageData[camera_url])
 
         if "ConveyorSplit" in existingPackageData[camera_url]:
         # Fetch the existing conveyor split data
-            conveyor_split = existingPackageData["ConveyorSplit"]
+            conveyor_split = existingPackageData[camera_url]["ConveyorSplit"]
 
             # Update the conveyor data for the specific camera/conveyor
             conveyor_split[f"{camera_id}"] = {
@@ -282,13 +335,19 @@ def create_new_item_from_updates(camera_url):
                 "endTime": last_entry_time[camera_url],
                 "totalCount": total_count,
                 "duration": duration,
-                "conveyor": uploadPackageData[camera_url]
+                "packageCount": uploadPackageData[camera_url],
+                "current" : current_time
             }
 
+
+            print("existing split",conveyor_split )
+            temp = {}
+            temp[camera_url] = update_package_data(conveyor_split ,existingPackageData[camera_url].get("packageData") , existingPackageData[camera_url].get("targetPackage") )
         # Push the updated ConveyorSplit back to the document
-            db.collection.update_one(
+            print("temp verify",temp[camera_url])
+            collection.update_one(
                 {"_id": ObjectId(camera_storage_ids[camera_url])},
-                {"$set": {"ConveyorSplit": conveyor_split}}
+                {"$set": {"ConveyorSplit": conveyor_split, "packageData" : temp[camera_url]["packageData"] , "summary" : temp[camera_url]["summary"],"totalCount" : temp[camera_url]["totalCount"]}},upsert=True
             )
         else:
             # If ConveyorSplit doesn't exist, create it
@@ -298,15 +357,18 @@ def create_new_item_from_updates(camera_url):
                     "endTime": last_entry_time[camera_url],
                     "totalCount": total_count,
                     "duration": duration,
-                    "conveyor": uploadPackageData[camera_url]
+                    "packageCount": uploadPackageData[camera_url],
+                    "current" : current_time
+
                 }
             }
 
-
+            temp = {}
+            temp[camera_url] = update_package_data(new_conveyor_split ,existingPackageData[camera_url].get("packageData") , existingPackageData[camera_url].get("targetPackage") )
             # Update the document with the new ConveyorSplit
             collection.update_one(
                 {"_id": ObjectId(camera_storage_ids[camera_url])},
-                {"$set": {"ConveyorSplit": new_conveyor_split}}
+                {"$set": {"ConveyorSplit": new_conveyor_split , "packageData" : temp[camera_url]["packageData"] , "summary" : temp[camera_url]["summary"],"totalCount" : temp[camera_url]["totalCount"]}},upsert=True
             )
 
 
