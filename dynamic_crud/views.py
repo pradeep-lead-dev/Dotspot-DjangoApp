@@ -56,7 +56,7 @@ def getAll(req,collectionName):
                         del d[field]
             finaldata = [d for d in data if  isNeeded(d)]
 
-            return Response({'success': True , 'data': finaldata}, status=status.HTTP_200_OK)
+            return Response({'success': True , 'data': finaldata[::-1]}, status=status.HTTP_200_OK)
         
         else :
             return Response({"message" : "No Data Found" , "data" : data , "success" : False})

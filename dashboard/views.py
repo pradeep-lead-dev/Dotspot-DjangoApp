@@ -219,7 +219,7 @@ def update_existing_with_data(existing_data, data_to_push):
 
 
 
-def update_package_data(conveyor_split, package_data,targetPackage = 100):
+def update_package_data(conveyor_split, package_data,targetPackage  , existingData ):
     # Convert package_data to a dict for easier updating, using 'variant' as key
     print("temp verify",conveyor_split, package_data,targetPackage = 100)
 
@@ -231,8 +231,12 @@ def update_package_data(conveyor_split, package_data,targetPackage = 100):
         print(i)
 
     print(f'\n {package_data}\n')
-    
-    summary = f"Target count : {targetPackage}\n"
+    summary = "Report Summary \n"
+    summary += f"Loader Vehicle : {existingData.get("existingPackageData[camera_url]","N/A")}\n"
+    summary += f"Performance Overview\n"
+    summary += f"Target : {targetPackage}\n"
+    summary += f"Actual : {totalCount}\n"
+    summary += f"Details\n"
 
     for split_key, split_value in conveyor_split.items():
         totalCount += split_value['totalCount']
@@ -253,7 +257,6 @@ def update_package_data(conveyor_split, package_data,targetPackage = 100):
                     'targetCount': package['targetCount'],
                     'actualCount': actual_count
                 }
-    summary += f"Actual Count - {totalCount}\n"
     summary += str("-"*15 +"\n")
     summary += f"Balance  - {targetPackage - totalCount}\n"
 
@@ -342,7 +345,7 @@ def create_new_item_from_updates(camera_url):
 
             print("existing split",conveyor_split )
             temp = {}
-            temp[camera_url] = update_package_data(conveyor_split ,existingPackageData[camera_url].get("packageData") , existingPackageData[camera_url].get("targetPackage") )
+            temp[camera_url] = update_package_data(conveyor_split ,existingPackageData[camera_url].get("packageData") , existingPackageData[camera_url].get("targetPackage"),existingPackageData[camera_url] )
         # Push the updated ConveyorSplit back to the document
             print("temp verify",temp[camera_url])
             collection.update_one(
@@ -364,7 +367,7 @@ def create_new_item_from_updates(camera_url):
             }
 
             temp = {}
-            temp[camera_url] = update_package_data(new_conveyor_split ,existingPackageData[camera_url].get("packageData") , existingPackageData[camera_url].get("targetPackage") )
+            temp[camera_url] = update_package_data(new_conveyor_split ,existingPackageData[camera_url].get("packageData") , existingPackageData[camera_url].get("targetPackage"),existingPackageData[camera_url] )
             # Update the document with the new ConveyorSplit
             collection.update_one(
                 {"_id": ObjectId(camera_storage_ids[camera_url])},
