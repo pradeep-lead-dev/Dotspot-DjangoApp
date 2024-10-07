@@ -233,12 +233,12 @@ def update_package_data(conveyor_split, package_data,targetPackage  , existingDa
         print(i)
 
     print(f'\n {package_data}\n')
-    summary = "Report Summary \n"
-    summary += f"Loader Vehicle : {existingData.get("vehicleNumber","N/A")}\n"
-    summary += f"Performance Overview\n"
-    summary += f"Target : {targetPackage}\n"
-    summary += f"Actual : {totalCount}\n"
-    summary += f"Details\n"
+    summary = "Report Summary \n\n"
+    summary += f"*Loader Vehicle* : {existingData.get("vehicleNumber","N/A")}\n\n"
+    summary += f"*Performance Overview*\n"
+    summary += f"*Target* : {targetPackage}\n"
+    summary += f"*Actual* : {totalCount}\n"
+    summary += f"*Details*\n\n"
 
     for split_key, split_value in conveyor_split.items():
         totalCount += split_value['totalCount']
