@@ -142,7 +142,7 @@ def specificAction(request , collectionName , param):
         permissions = []
     else :
         permissions = payload.get('permissions')[:]
-
+        
 
     collection = db[collectionName]
     query_field = request.headers.get('query-field', None)
@@ -162,6 +162,8 @@ def specificAction(request , collectionName , param):
             for i in formData:
                 if isinstance(i,datetime.datetime):
                     i = i.isoformat()
+
+            
 
         print("formData" , formData)
         if param == "undefined":
@@ -205,9 +207,12 @@ def specificAction(request , collectionName , param):
                 if field not in non_editable_fields:
                     filtered_data[field] = updated_data[field]  
             filtered_data["updated_at"] = datetime.datetime.now()
+            
+
             if query_field:
                 previous_data = dict(collection.find_one({query_field : param}))
                 if previous_data :
+
                     previous_data.pop("_id")
                     if previous_data.get('previous'):
                         previous_data.pop('previous')

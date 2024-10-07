@@ -107,9 +107,9 @@ def send_whatsapp_message(number, message):
         if response.status_code == 200:
             return response.json()
         else:
-            return {"error": f"Failed to send message. Status code: {response.status_code}"}
+            print( {"error": f"Failed to send message. Status code: {response.status_code}"})
     except Exception as e:
-        return {"error": str(e)}
+        print( {"error": str(e)})
 
 
 def send_multiple_whatsapp_message(number, message):
@@ -133,6 +133,7 @@ def template_to_msg(message_template, id="67024d81ac773f1b89615276"):
     # Find all placeholders inside {{ }}
     # message_template = "{{master.vehicleNumber}} ,  {{master.packageData}}"
     print(f'message template\n-------------\n{message_template}\n------------\n' , )
+    # str(message_template).replace('--n--','nnn')
     msg = re.findall(r'{{(.*?)}}', message_template)
 
     # Dictionary to store replacement values
@@ -147,7 +148,7 @@ def template_to_msg(message_template, id="67024d81ac773f1b89615276"):
         # Fetch the data from the appropriate collection
         collection = db[tablename]  # Replace `db` with your actual MongoDB connection
         data_from_db = collection.find_one({"_id": ObjectId(id)})
-        print(f"database data/n{data_from_db["orderId"]}, {field_path} ,{data_from_db}/n")
+        print(f"database data/n, {field_path} ,{data_from_db}/n")
         # Follow the field path dynamically
         if data_from_db:
             value = data_from_db
@@ -210,24 +211,128 @@ def trigger(request):
     print("----------> Trigred Notify")
     data = json.loads(request.body)
     id = data.get('id')
+    subject = data.get('subject','Order Id Update')
+
+    roles = data.get('roles')
+    message_template = data.get('messageTemplate',"{{master.orderId}}")
     print(data)
-    contacts = get_contacts(id)
-    for contact in contacts:
-        message= contact.get('messageTemplate')
-        print(send_email_function(subject="Order Id Update" ,message= message ,to_field= contact.get('email') ))
-        print("contact-----------", contact)
+    message_template = str(message_template.replace("--n--",'\n'))
+    master_collection = db["master"]
+    contact_collection = db["contacts"]
+    contacts = list(contact_collection.find({}))
+    filtered_contact = [contact for contact in contacts if contact.get("roles") in roles ]    
+    print("roles ------->" , filtered_contact , len(filtered_contact))
+    print("templateee",message_template)
+
+    for contact in filtered_contact:
+        template = template_to_msg(message_template , id)
+        print("details ----->",contact.get('whatsapp') , contact.get('email'))
         if contact.get('whatsapp'):
             whatsapp = str(contact.get('whatsapp')).replace("+","")
             if len(whatsapp)==10 :
                 whatsapp = "91" + whatsapp
-                send_whatsapp_message(whatsapp , message)
+                send_whatsapp_message(whatsapp , template)
             elif len(whatsapp)==12 :
-                send_whatsapp_message(whatsapp , message)
-                pass
+                send_whatsapp_message(whatsapp , template)
+                
             else:
                 print("In valid Whatsapp Number Format")
-                
-    return Response({'req': data}, status=200)
 
-get_contacts(id="67024d81ac773f1b89615276")
+        if contact.get('email'):
+            email = contact.get('email')
+            print(send_email_function(subject= subject ,message= template ,to_field= email ))
+        print("-------------- notify")
+
+
+    # for contact in contacts:
+    #     message= contact.get('messageTemplate')
+    #     print(send_email_function(subject="Order Id Update" ,message= message ,to_field= contact.get('email') ))
+    #     print("contact-----------", contact)
+    #     if contact.get('whatsapp'):
+    #         whatsapp = str(contact.get('whatsapp')).replace("+","")
+    #         if len(whatsapp)==10 :
+    #             whatsapp = "91" + whatsapp
+    #             send_whatsapp_message(whatsapp , message)
+    #         elif len(whatsapp)==12 :
+    #             send_whatsapp_message(whatsapp , message)
+    #             pass
+    #         else:
+    #             print("In valid Whatsapp Number Format")
+                
+        return Response({'msg': "Notification Pushed Successfully" , "success" : True}, status=200)
+    return Response({'msg': "No Contact to Push Notification" , "success" : True}, status=200)
+
+# get_contacts(id="67024d81ac773f1b89615276")
 # send_email_function(subject="Order Id Update" ,message= "hiii" ,to_field= 'sabarinathan3011@gmail.com')
+
+@api_view(["POST"])
+def calculate_weight(req):
+    id = req.data.get("id")
+    master_collection = db['master']
+    objects_collection = db['objects']
+    print(id)
+    master_data = master_collection.find_one({"_id":ObjectId(id)})
+    package_data = master_data.get("packageData")
+    master_data["_id"] = id
+    calculated_target_weight = 0
+    target_weight = 0
+    object_data = list(objects_collection.find({}))
+
+    object_dict = {item['name']: item for item in object_data}
+    actual_load_weight = master_data.get('cargoWeight',0)
+    actual_empty_weight = master_data.get('tareWeight',0)
+    if package_data:
+        for package in package_data :
+            packageName = package.get("variant")
+            actualCount = package.get("actualCount")
+            targetCount = package.get("targetCount")
+            if packageName in object_dict :
+                try:
+                    weight = object_dict.get(packageName).get('weight',6)
+                except:
+                    print("Weight not found --- used Average weight")
+                    weight= 6
+                
+                calculated_target_weight += (actualCount*weight)
+                target_weight += (targetCount*weight)
+
+            print(packageName,actualCount,targetCount , "weight = ",object_dict.get(packageName).get('weight') )
+        print("---------->",calculated_target_weight,target_weight)
+
+        diffrence_weight = int(actual_load_weight) - int(actual_empty_weight)
+        data_to_update = { 
+            "targetWeight" : calculated_target_weight,
+            "actualTargetWeight":diffrence_weight,
+        }
+        master_collection.update_one({'_id': ObjectId(id)}, {'$set': data_to_update})
+
+
+        print("object_data" , object_dict)
+        # print("object_arr" , object_data)
+
+        return Response({"success" : True ,"msg":master_data})
+    return Response({"success" : False ,"msg":"Packege Data None Error"})
+
+
+
+
+@api_view(['POST'])
+def change_camera_details(req):
+    print("req body ---------->",req.data)
+    camera_url = req.data.get('camera')
+    id = req.data.get('id')
+    camera_collection = db["camera"]
+    if camera_url:
+        camera_detail = camera_collection.find_one({"cameraUrl" : camera_url})
+        print("cam details ----->",camera_detail)
+        if camera_detail :
+            data_to_push = {'cameraId': camera_detail.get('cameraId') , 
+                            'cameraAlias':camera_detail.get('cameraAlias')
+                            }
+            print("update cam details ----->",data_to_push)
+            master_collection = db["master"]
+            master_collection.update_one({"_id": ObjectId(id)}, {'$set': data_to_push})
+
+        return Response({"success" : True ,"msg":"Camera Details Updated"})
+    
+    return Response({"success" : True ,"msg":"Camera Details Not Updated"})

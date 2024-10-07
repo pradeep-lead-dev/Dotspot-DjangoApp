@@ -7,6 +7,7 @@ import requests
 from bson.objectid import ObjectId
 from datetime import datetime
 import json
+import ast , re
 # Connect to MongoDB
 database_name = settings.DATABASE_NAME
 connection_string = settings.DATABASE_CONNECTION_STRING
@@ -227,13 +228,54 @@ def json_serial(obj):
         return obj.isoformat()  # Convert datetime to string in ISO format
     raise TypeError(f"Type {type(obj)} not serializable")
 
+
+def sanitize_body_string(body_str):
+    # Replace control characters (if any) that are not allowed in JSON
+    # For example, replace unescaped newline or tab characters
+    sanitized_str = re.sub(r'[\x00-\x1F\x7F]', '', body_str)
+    # sanitized_str = re.sub(r'[\x00-\x1F\x7F]', lambda x: '' if x.group(0) != '\n' else '\n', body_str)
+
+       
+    # Convert newline characters to escaped newline
+    return sanitized_str
+
+
 def trigger_webhook(action, updated_fields, current_collection_name, document_id):
     try:
         webhook_url = action.get('url')
-        headers = dict(action.get('headers', {}))
-        body = dict(action.get('body', {}))
-        print(action, type(body))
-        method = action.get('method', 'get').upper()
+
+        headers = action.get('headers', {})
+        
+        # Ensure headers is a dictionary
+        if not isinstance(headers, dict):
+            headers = {}
+
+        # Format headers to ensure proper content type if not set
+        if 'Content-Type' not in headers:
+            headers['Content-Type'] = 'application/json'
+
+        if not webhook_url.startswith(('http://', 'https://')):
+            webhook_url = 'http://' + webhook_url
+            
+        body_str = action.get('body', "")
+        body = {}
+
+        # Sanitize the body string
+        if body_str:
+
+            body_str = sanitize_body_string(body_str)  # Clean the string
+            
+            try:
+                # Try to load the body as JSON
+                body = json.loads(body_str)
+            except json.JSONDecodeError as json_err:
+                print(f"JSON decode error: {json_err}")
+                return  # Exit if JSON parsing fails
+
+        print("action----->", action, type(body))
+        
+        print('body ----->', body)
+        method = str(action.get('method', 'get')).upper()
         body["id"] = str(document_id)
         body["tableName"] = current_collection_name
         
@@ -245,14 +287,15 @@ def trigger_webhook(action, updated_fields, current_collection_name, document_id
         # Add updated fields to the body
         body.update(updated_fields)
         
-        print("\n\n", body)
+        print("\nbody\n", body)
         print(f"Triggering webhook: {webhook_url} with headers: {headers} and body: {body}")
 
         if method == 'POST':
-            # response = requests.post(webhook_url, json=body, headers=headers)
-            response = requests.post(webhook_url, json=json.loads(json.dumps(body, default=json_serial)), headers=headers)
+            # Send POST request with JSON body
+            response = requests.post(webhook_url, json=body, headers=headers)
 
         elif method == 'GET':
+            # Send GET request with parameters
             response = requests.get(webhook_url, headers=headers, params=body)
 
         # Check response status
@@ -260,9 +303,9 @@ def trigger_webhook(action, updated_fields, current_collection_name, document_id
             print(f"Webhook triggered successfully: {response.status_code}")
         else:
             print(f"Failed to trigger webhook. Status code: {response.status_code}")
-            # print("Response:", response.text)
     except Exception as e:
-        print(f"Error while triggering webhook:{e}")
+        print(f"Error while triggering webhook: {e}")
+
 
 def start_watching():
     """

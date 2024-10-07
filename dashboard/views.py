@@ -233,16 +233,24 @@ def update_package_data(conveyor_split, package_data,targetPackage  , existingDa
         print(i)
 
     print(f'\n {package_data}\n')
-    summary = "Report Summary \n\n"
+    summary = "*Report Summary* \n\n"
     summary += f"*Loader Vehicle* : {existingData.get("vehicleNumber","N/A")}\n\n"
     summary += f"*Performance Overview*\n"
-    summary += f"*Target* : {targetPackage}\n"
-    summary += f"*Actual* : {totalCount}\n"
+    summary += f"   - *Target* : {targetPackage}\n"
+    summary += f"   - *Actual* : {totalCount}\n"
     summary += f"*Details*\n\n"
-
+    start_times = []
+    end_times = []
     for split_key, split_value in conveyor_split.items():
         totalCount += split_value['totalCount']
         summary += f"{split_key} - {split_value['totalCount']} \n"
+        if split_value.get('startTime'):
+            start_times.append(split_value.get('startTime'))
+
+        if split_value.get('endTime'):
+            end_times.append(split_value.get('endTime'))
+
+            
         for package in split_value['packageCount']:
             variant = package['variant']
             actual_count = package['actualCount']
@@ -259,18 +267,23 @@ def update_package_data(conveyor_split, package_data,targetPackage  , existingDa
                     'targetCount': package['targetCount'],
                     'actualCount': actual_count
                 }
-    summary += str("-"*15 +"\n")
-    summary += f"Balance  - {targetPackage - totalCount}\n"
+    summary += f"*Balance*  - {targetPackage - totalCount}\n"
 
     print(totalCount)
     print(summary)
-
+    start = min(start_times)
+    end = max(end_times)
     transformed_data = {
         "packageData" : list(package_data_dict.values()) ,
         "totalCount" : totalCount ,
-        "summary" : summary
+        "summary" : summary,
+        "startTime" : start,
+        "endTime" : end,
+        "duration" :(end-start).total_seconds()
     }
     # Convert back to list
+    print("-------------> transformed data",transformed_data)
+
     return transformed_data
 
 
@@ -308,7 +321,8 @@ def create_new_item_from_updates(camera_url):
         data_to_push = {}
         for key, value in update_data.items():
             new_key = str(key).replace('_count', '')
-            data_to_push[new_key] = value
+            if new_key != "total":
+                data_to_push[new_key] = value
 
         existingPackageData[camera_url] = collection.find_one({"_id" : ObjectId(camera_storage_ids[camera_url])})
 
@@ -353,7 +367,12 @@ def create_new_item_from_updates(camera_url):
             print("temp verify",temp[camera_url])
             collection.update_one(
                 {"_id": ObjectId(camera_storage_ids[camera_url])},
-                {"$set": {"ConveyorSplit": conveyor_split, "packageData" : temp[camera_url]["packageData"] , "summary" : temp[camera_url]["summary"],"totalCount" : temp[camera_url]["totalCount"]}},upsert=True
+                {"$set": {"ConveyorSplit": conveyor_split, "packageData" : temp[camera_url]["packageData"] , "summary" : temp[camera_url]["summary"],
+                           "startTime":temp[camera_url]["startTime"],
+                          "endTime":temp[camera_url]["endTime"],
+                          "duration":temp[camera_url]["duration"],
+                          
+                          "totalCount" : temp[camera_url]["totalCount"]}},upsert=True
             )
         else:
             # If ConveyorSplit doesn't exist, create it
@@ -374,7 +393,13 @@ def create_new_item_from_updates(camera_url):
             # Update the document with the new ConveyorSplit
             collection.update_one(
                 {"_id": ObjectId(camera_storage_ids[camera_url])},
-                {"$set": {"ConveyorSplit": new_conveyor_split , "packageData" : temp[camera_url]["packageData"] , "summary" : temp[camera_url]["summary"],"totalCount" : temp[camera_url]["totalCount"]}},upsert=True
+                {"$set": {"ConveyorSplit": new_conveyor_split , "packageData" : temp[camera_url]["packageData"] , "summary" : temp[camera_url]["summary"],
+                          "startTime":temp[camera_url]["startTime"],
+                          "endTime":temp[camera_url]["endTime"],
+                          "duration":temp[camera_url]["duration"],
+                          
+                          "totalCount" : temp[camera_url]["totalCount"]
+                          }},upsert=True
             )
 
 
@@ -599,24 +624,19 @@ class VideoFeed(APIView):
     """
     APIView to return video feed for a specific camera.
     """
-    def get(self, request, camera_no = 1):
+    def get(self, request, camera_id):
         # Ensure the URL passed exists in the processing threads
-        print(str(camera_no).isnumeric() , camera_no)
-        if ( not str(camera_no).isnumeric() or  int(camera_no) == 0 ):
-            return Response({"error": "Bad Request"}, status=400)
-
-        cameraNo = int(camera_no)-1
-        
-        if cameraNo >= len(camera_urls) or  camera_urls[cameraNo] not in camera_urls:
-            return Response({"error": "Camera URL not found" }, status=404)
-        
-        camera_url = camera_urls[cameraNo]
+        camera_collection = db["camera"]
+        camera = camera_collection.find_one({"cameraId" : camera_id})
+        if not camera:
+            return Response({"error": "Camera Not Verified" }, status=404)
+        camera_url = camera.get("cameraUrl")
         if not processing_flags.get(camera_url, False):
             return Response({"error": "Camera Processing Not yet Started" }, status=404)
 
         # Stream the frames for the requested camera
         return StreamingHttpResponse(
-            generate_frames(camera_urls[cameraNo]),
+            generate_frames(camera_url),
             content_type='multipart/x-mixed-replace; boundary=frame'
         )
 
