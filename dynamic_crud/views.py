@@ -7,6 +7,8 @@ from bson.objectid import ObjectId
 from django.conf import settings
 import datetime
 from user_auth.views import check , verify_jwt_token , verify_and_get_payload# Import from the separate decorators file
+from decimal import Decimal
+import json
 
 restricted_fields  = settings.SENSITIVE_COLUMN
 non_editable_fields = settings.NON_EDITABLE_COLUMN
@@ -17,6 +19,16 @@ client = MongoClient(connection_string)
 db = client[database_name] 
 
 
+def convert_datetime_to_string(data):
+    if isinstance(data, dict):
+        return {k: convert_datetime_to_string(v) for k, v in data.items()}
+    elif isinstance(data, list):
+        return [convert_datetime_to_string(item) for item in data]
+    elif isinstance(data, datetime):
+        return data.strftime('%Y-%m-%d %H:%M:%S')  # Format datetime to string
+    else:
+        return data
+    
 
 def isNeeded(data):
     return not data.get("isDeleted",False)
@@ -128,6 +140,20 @@ def specificAction(request , collectionName , param):
     if request.method == 'GET':
         if (not permissions or str(collectionName+".read") not in permissions) and payload != "allow.all":
             return Response({'message': 'Permission Denied', 'success': False}, status=401)
+        
+        try:
+            table_collection = db["forms"]
+            formData = table_collection.find_one({"tableName" : collectionName})
+        except Exception as e:
+            print("Error While fetch table Data from Form Table",e)
+        serialized_data = None
+        if formData:
+            formData.pop("_id")
+            for i in formData:
+                if isinstance(i,datetime.datetime):
+                    i = i.isoformat()
+
+        print("formData" , formData)
         try:
             if query_field:
                 form = collection.find_one({query_field : param})
@@ -139,11 +165,11 @@ def specificAction(request , collectionName , param):
                 form['_id'] = str(form['_id'])
                 filtered_fields = []
                 # [field for field in form.get('fields', []) if field['key'] not in restricted_fields]
-                print(type(form))
+                print(type(form),type(formData))
                 for field in form:
                     if field in  restricted_fields:
                         form[field] = None
-                return Response({'success': True, 'data': form}, status=status.HTTP_200_OK)
+                return Response({'success': True, 'data': form ,'formData' : formData }, status=status.HTTP_200_OK)
                 
                 
                 # Filter out restricted fields
