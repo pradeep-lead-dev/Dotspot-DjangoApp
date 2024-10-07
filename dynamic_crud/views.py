@@ -30,6 +30,16 @@ def convert_datetime_to_string(data):
         return data
     
 
+def is_valid_objectid(id_string):
+    try:
+        # Try to create an ObjectId instance from the string
+        ObjectId(id_string)
+        return True
+    except Exception:
+        return False
+
+
+
 def isNeeded(data):
     return not data.get("isDeleted",False)
 
@@ -154,13 +164,17 @@ def specificAction(request , collectionName , param):
                     i = i.isoformat()
 
         print("formData" , formData)
+        if param == "undefined":
+            return Response({'success': True ,'formData' : formData }, status=status.HTTP_200_OK)
         try:
             if query_field:
                 form = collection.find_one({query_field : param})
                 
                 print("use q ", query_field , param)
             else:
+
                 form = collection.find_one({'_id': ObjectId(param)})
+
             if form and isNeeded(form):
                 form['_id'] = str(form['_id'])
                 filtered_fields = []
