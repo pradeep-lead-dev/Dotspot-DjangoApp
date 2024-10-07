@@ -90,7 +90,7 @@ DATABASES = {
     }
 }
 
-CORS_ALLOW_ALL_ORIGINS = False  # Disable wildcard
+CORS_ALLOW_ALL_ORIGINS = True  # Disable wildcard
 
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",  # Example for local dev  # Replace with your actual domain
