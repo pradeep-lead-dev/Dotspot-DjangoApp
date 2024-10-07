@@ -214,7 +214,7 @@ def trigger(request):
     contacts = get_contacts(id)
     for contact in contacts:
         message= contact.get('messageTemplate')
-        # print(send_email_function(subject="Order Id Update" ,message= message ,to_field= contact.get('email') ))
+        print(send_email_function(subject="Order Id Update" ,message= message ,to_field= contact.get('email') ))
         print("contact-----------", contact)
         if contact.get('whatsapp'):
             whatsapp = str(contact.get('whatsapp')).replace("+","")

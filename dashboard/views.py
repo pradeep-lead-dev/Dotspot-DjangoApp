@@ -64,7 +64,7 @@ processing = False
 model_path = './models/demo.pt'
 
 model_path = 'models/demo.pt'
-camera_urls = ["D:\pythonProjectNew\samplevideos\orange_10s.mp4"]
+camera_urls = []
 
 camera_storage_ids = {}
 # camera_urls = ['./samplevideos/orange_10s.mp4', './samplevideos/sample1.mp4', 'rtsp://admin:Admin@123@115.244.221.74:2025/H.264']
@@ -120,6 +120,7 @@ def get_camera_details():
 
 
 get_camera_details()
+print("cam urls ---->",camera_urls)
 print("cam details ---->",cameradetails)
 # cameradetails[]
 # Initialize video capture
@@ -221,7 +222,8 @@ def update_existing_with_data(existing_data, data_to_push):
 
 def update_package_data(conveyor_split, package_data,targetPackage  , existingData ):
     # Convert package_data to a dict for easier updating, using 'variant' as key
-    print("temp verify",conveyor_split, package_data,targetPackage = 100)
+    # print("temp verify",conveyor_split, package_data,targetPackage)
+    print("temp verify",existingData)
 
     package_data_dict = {item['variant']: item for item in package_data}
     max_key = max(item['key'] for item in package_data)  # Find max key for new entries
@@ -232,7 +234,7 @@ def update_package_data(conveyor_split, package_data,targetPackage  , existingDa
 
     print(f'\n {package_data}\n')
     summary = "Report Summary \n"
-    summary += f"Loader Vehicle : {existingData.get("existingPackageData[camera_url]","N/A")}\n"
+    summary += f"Loader Vehicle : {existingData.get("vehicleNumber","N/A")}\n"
     summary += f"Performance Overview\n"
     summary += f"Target : {targetPackage}\n"
     summary += f"Actual : {totalCount}\n"
@@ -327,6 +329,7 @@ def create_new_item_from_updates(camera_url):
             "packageData" : uploadPackageData[camera_url]
         }
         print("existing data-->",existingPackageData[camera_url])
+        print("existing end-->")
 
         if "ConveyorSplit" in existingPackageData[camera_url]:
         # Fetch the existing conveyor split data
@@ -343,7 +346,7 @@ def create_new_item_from_updates(camera_url):
             }
 
 
-            print("existing split",conveyor_split )
+            print("existing split",conveyor_split ,existingPackageData[camera_url].get("packageData") , existingPackageData[camera_url].get("targetPackage") )
             temp = {}
             temp[camera_url] = update_package_data(conveyor_split ,existingPackageData[camera_url].get("packageData") , existingPackageData[camera_url].get("targetPackage"),existingPackageData[camera_url] )
         # Push the updated ConveyorSplit back to the document
