@@ -176,13 +176,18 @@ def start_camera(action, updated_fields,document_id,stop=False):
         collection = db[tableName]
         
         print("inside the startcamera func")
+        
+        print("previous" , tableName , document_id)
         previous = updated_fields.get('previous')
         # print("previous Data",previous.get(fieldName))
         # running_camera  = previous.get(fieldName)
         cameraUrl = updated_fields.get('camera')
         if stop :
             api_url = "http://localhost:8000/api/dashboard/stop-camera"  # The API endpoint URL from the JSON
-            current_camera = collection.find_one()
+            master_collection = db['master']
+            current_data = master_collection.find_one({"_id" : ObjectId(document_id)})
+            print("current data" , current_data)
+            cameraUrl = current_data.get('camera')
         # stop the previous camera by request
         # if not stop and running_camera:
         #     stop_url = "http://localhost:8000/api/dashboard/stop-camera"
