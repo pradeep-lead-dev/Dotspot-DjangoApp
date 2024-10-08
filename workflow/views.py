@@ -232,13 +232,10 @@ def json_serial(obj):
 def sanitize_body_string(body_str):
     # Replace control characters (if any) that are not allowed in JSON
     # For example, replace unescaped newline or tab characters
-    sanitized_str = re.sub(r'[\x00-\x1F\x7F]', '', body_str)
-    # sanitized_str = re.sub(r'[\x00-\x1F\x7F]', lambda x: '' if x.group(0) != '\n' else '\n', body_str)
+    sanitized_str = re.sub(r'[\x00-\x09\x0B-\x1F\x7F]', '', body_str)
 
-       
-    # Convert newline characters to escaped newline
+    # sanitized_str = re.sub(r'[\x00-\x1F\x7F]', '', body_str)  # Remove control characters
     return sanitized_str
-
 
 def trigger_webhook(action, updated_fields, current_collection_name, document_id):
     try:
@@ -250,19 +247,14 @@ def trigger_webhook(action, updated_fields, current_collection_name, document_id
         if not isinstance(headers, dict):
             headers = {}
 
-        # Format headers to ensure proper content type if not set
-        if 'Content-Type' not in headers:
-            headers['Content-Type'] = 'application/json'
-
         if not webhook_url.startswith(('http://', 'https://')):
             webhook_url = 'http://' + webhook_url
-            
         body_str = action.get('body', "")
+        print(body_str, "booody str")
         body = {}
 
         # Sanitize the body string
         if body_str:
-
             body_str = sanitize_body_string(body_str)  # Clean the string
             
             try:
@@ -274,7 +266,7 @@ def trigger_webhook(action, updated_fields, current_collection_name, document_id
 
         print("action----->", action, type(body))
         
-        print('body ----->', body)
+        print('body ----->' , body )
         method = str(action.get('method', 'get')).upper()
         body["id"] = str(document_id)
         body["tableName"] = current_collection_name
@@ -305,6 +297,7 @@ def trigger_webhook(action, updated_fields, current_collection_name, document_id
             print(f"Failed to trigger webhook. Status code: {response.status_code}")
     except Exception as e:
         print(f"Error while triggering webhook: {e}")
+
 
 
 def start_watching():
