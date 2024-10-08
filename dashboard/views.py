@@ -420,7 +420,7 @@ def create_new_item_from_updates(camera_url):
 # Initialize the counter for object counting
 def initialize_counter(camera_url):
     global counters
-    line_points = [(600, 900), (2000, 750)]
+    line_points = [(600, 900), (1700, 900)]
     counter = solutions.ObjectCounter(
         view_img=False,
         reg_pts=line_points,
