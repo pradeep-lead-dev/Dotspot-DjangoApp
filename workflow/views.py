@@ -243,6 +243,7 @@ def sanitize_body_string(body_str):
     # sanitized_str = re.sub(r'[\x00-\x1F\x7F]', '', body_str)  # Remove control characters
     return sanitized_str
 
+
 def trigger_webhook(action, updated_fields, current_collection_name, document_id):
     try:
         webhook_url = action.get('url')
@@ -253,15 +254,16 @@ def trigger_webhook(action, updated_fields, current_collection_name, document_id
         if not isinstance(headers, dict):
             headers = {}
 
+        # Ensure webhook_url is a valid URL
         if not webhook_url.startswith(('http://', 'https://')):
             webhook_url = 'http://' + webhook_url
+            
         body_str = action.get('body', "")
-        print(body_str, "booody str")
         body = {}
 
-        # Sanitize the body string
+        # Sanitize and parse the body string
         if body_str:
-            body_str = sanitize_body_string(body_str)  # Clean the string
+            body_str = sanitize_body_string(body_str)
             
             try:
                 # Try to load the body as JSON
@@ -271,29 +273,29 @@ def trigger_webhook(action, updated_fields, current_collection_name, document_id
                 return  # Exit if JSON parsing fails
 
         print("action----->", action, type(body))
+        print('body ----->', body)
         
-        print('body ----->' , body )
         method = str(action.get('method', 'get')).upper()
+
+        # Add additional fields to the body
         body["id"] = str(document_id)
         body["tableName"] = current_collection_name
-        
-        # Convert datetime objects to string (ISO format) if they exist
+
+        # Convert datetime objects to ISO format (yyyy-mm-ddThh:mm:ss)
         for key, value in updated_fields.items():
             if isinstance(value, datetime):
                 updated_fields[key] = value.isoformat()
-        
+
         # Add updated fields to the body
         body.update(updated_fields)
-        
+
         print("\nbody\n", body)
         print(f"Triggering webhook: {webhook_url} with headers: {headers} and body: {body}")
 
+        # Make the appropriate HTTP request
         if method == 'POST':
-            # Send POST request with JSON body
             response = requests.post(webhook_url, json=body, headers=headers)
-
         elif method == 'GET':
-            # Send GET request with parameters
             response = requests.get(webhook_url, headers=headers, params=body)
 
         # Check response status
@@ -301,10 +303,10 @@ def trigger_webhook(action, updated_fields, current_collection_name, document_id
             print(f"Webhook triggered successfully: {response.status_code}")
         else:
             print(f"Failed to trigger webhook. Status code: {response.status_code}")
+
     except Exception as e:
         print(f"Error while triggering webhook: {e}")
-
-
+        
 
 def start_watching():
     """

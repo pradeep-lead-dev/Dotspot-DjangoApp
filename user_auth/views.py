@@ -152,7 +152,7 @@ def verify_token_route(req):
 def verify_and_get_payload(req):
     try:
         token =str(req.headers.get('Authorization', None)).split(" ")[1]
-        print("------------>payload_auth",token)
+        # print("------------>payload_auth",token)
         if token == settings.BY_PASS_TOKEN:
             payload = "allow.all"
         else:

@@ -89,8 +89,8 @@ def getAll(req,collectionName):
         if not permissions or str(collectionName+".create") not in permissions:
             return Response({'message': 'Permission Denied', 'success': False}, status=401)
         dataToPost = req.data
-        dataToPost["updated_at"] = datetime.datetime.now()
-        dataToPost["created_at"] = datetime.datetime.now()
+        dataToPost["updated_at"] = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        dataToPost["created_at"] = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         # if "autoincrement" in dataToPost :
 
         try :
@@ -206,7 +206,7 @@ def specificAction(request , collectionName , param):
             for field in updated_data:
                 if field not in non_editable_fields:
                     filtered_data[field] = updated_data[field]  
-            filtered_data["updated_at"] = datetime.datetime.now()
+            filtered_data["updated_at"] = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             
 
             if query_field:
