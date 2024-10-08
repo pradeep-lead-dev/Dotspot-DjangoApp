@@ -66,6 +66,7 @@ def getAll(req,collectionName):
 
     collection = db[collectionName]
     if req.method == 'GET':
+        
         if (not permissions or str(collectionName+".read") not in permissions) and payload != "allow.all":
             return Response({'message': 'Permission Denied', 'success': False}, status=401)
         data = list(collection.find({}))
@@ -77,6 +78,15 @@ def getAll(req,collectionName):
                     if field in d:
                         del d[field]
             finaldata = [d for d in data if  isNeeded(d)]
+
+            if collectionName == "master" and payload != "allow.all":
+                print("statusToBeFiltered" , payload.get('statusToBeFiltered'))
+                to_filter = payload.get('statusToBeFiltered')
+                master_data= []
+                
+                master_data = [d for d in finaldata if d.get("status") in to_filter]
+
+                finaldata = master_data
 
             return Response({'success': True , 'data': finaldata[::-1]}, status=status.HTTP_200_OK)
         
@@ -185,6 +195,11 @@ def specificAction(request , collectionName , param):
                 for field in form:
                     if field in  restricted_fields:
                         form[field] = None
+
+                if collectionName == "master" and payload != "allow.all":
+                    print("statusToBeFiltered" , payload.get('statusToBeFiltered'))
+                    if form.get('status') not in payload.get('statusToBeFiltered') :
+                        return Response({'message': 'Access Denied', 'success': False}, status=401)
                 return Response({'success': True, 'data': form ,'formData' : formData }, status=status.HTTP_200_OK)
                 
                 
