@@ -59,20 +59,26 @@ def generate_jwt_token(user):
     roles = user.get('roles')
     roleHomePage = "/"
     tableDisplayName = ""
+
+    resultPriority = "user"
+    priority = 100000
     if roles:
         for role in roles:
             collection = db['roles'] 
             roleData = collection.find_one({"roleName" : role}) 
             roleHomePage = roleData.get("homePageRoute","/")
             print("roleData --->" , roleData)
-            tableDisplayName = roleData.get("tableDisplayName","")
+            if roleData.get('priorityIndex',1000) < priority:
+                resultPriority = roleData.get('roleName')
+                tableDisplayName = roleData.get("tableDisplayName","")
+
             if roleData:
                 roleDataPermisions = roleData.get("permissions")
                 if roleDataPermisions:
                     permissions += roleDataPermisions.split(",")
                     # print("\nrole permission ------>" , roleDataPermisions )
             
-            print(role)
+    print("result",resultPriority , tableDisplayName)
    
     finalPermissions = list(set(permissions))
     finalPermissions.sort()
