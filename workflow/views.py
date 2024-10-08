@@ -171,17 +171,18 @@ def start_camera(action, updated_fields,document_id,stop=False):
     """
     try:
         api_url = "http://localhost:8000/api/dashboard/start-camera" 
-        if stop :
-            api_url = "http://localhost:8000/api/dashboard/stop-camera"  # The API endpoint URL from the JSON
         tableName = action.get("tableName")
         fieldName = action.get("fieldName")
         collection = db[tableName]
-
+        
         print("inside the startcamera func")
         previous = updated_fields.get('previous')
         # print("previous Data",previous.get(fieldName))
         # running_camera  = previous.get(fieldName)
-        cameraUrl = updated_fields.get(fieldName)
+        cameraUrl = updated_fields.get('camera')
+        if stop :
+            api_url = "http://localhost:8000/api/dashboard/stop-camera"  # The API endpoint URL from the JSON
+            current_camera = collection.find_one()
         # stop the previous camera by request
         # if not stop and running_camera:
         #     stop_url = "http://localhost:8000/api/dashboard/stop-camera"
@@ -203,7 +204,7 @@ def start_camera(action, updated_fields,document_id,stop=False):
 
         # The camera ID or any other required parameter
         # print()
-        print(cameraUrl, document_id)
+        print(updated_fields , fieldName)
 
         if not cameraUrl:
             print("No API URL provided for camera action.")
@@ -212,7 +213,7 @@ def start_camera(action, updated_fields,document_id,stop=False):
         # Make an API call using the provided route (e.g., POST request)
         response = requests.post(api_url, json={"camera_url": cameraUrl,"id":str(document_id) })
 
-        # Check if the request was successful
+        # Check if the request was successful   
         if response.status_code == 200:
             # print(response.text)
             print(f"Camera {cameraUrl} action successful.")

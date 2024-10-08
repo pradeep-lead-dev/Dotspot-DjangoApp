@@ -322,6 +322,7 @@ def change_camera_details(req):
     camera_url = req.data.get('camera')
     id = req.data.get('id')
     camera_collection = db["camera"]
+    print("cam url ----->",camera_url)
     if camera_url:
         camera_detail = camera_collection.find_one({"cameraUrl" : camera_url})
         print("cam details ----->",camera_detail)
@@ -335,4 +336,4 @@ def change_camera_details(req):
 
         return Response({"success" : True ,"msg":"Camera Details Updated"})
     
-    return Response({"success" : True ,"msg":"Camera Details Not Updated"})
+    return Response({"success" : False ,"msg":"Camera Details Not Updated"})
