@@ -58,11 +58,13 @@ def generate_jwt_token(user):
         permissions = []
     roles = user.get('roles')
     roleHomePage = "/"
+    tableDisplayName = ""
     if roles:
         for role in roles:
             collection = db['roles'] 
             roleData = collection.find_one({"roleName" : role}) 
             roleHomePage = roleData.get("homePageRoute","/")
+            tableDisplayName = roleData.get("tableDisplayName","")
             if roleData:
                 roleDataPermisions = roleData.get("permissions")
                 if roleDataPermisions:
@@ -80,6 +82,7 @@ def generate_jwt_token(user):
         'permissions':finalPermissions,
         "roles":roles ,
         "homePageRoute" : roleHomePage ,
+        "tableDisplayName" : tableDisplayName ,
         'exp': datetime.utcnow() + timedelta(days=1),  # Expiration time
         'iat': datetime.utcnow()  # Issued at time
     }
