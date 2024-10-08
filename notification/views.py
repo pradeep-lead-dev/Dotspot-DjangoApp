@@ -301,8 +301,8 @@ def calculate_weight(req):
 
         diffrence_weight = int(actual_load_weight) - int(actual_empty_weight)
         data_to_update = { 
-            "targetWeight" : target_weight,
-            "actualTargetWeight":diffrence_weight,
+            "targetWeight" : diffrence_weight,
+            "actualTargetWeight":calculated_target_weight,
         }
         master_collection.update_one({'_id': ObjectId(id)}, {'$set': data_to_update})
 
