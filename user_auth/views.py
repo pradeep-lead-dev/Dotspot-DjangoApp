@@ -63,6 +63,7 @@ def generate_jwt_token(user):
 
     resultPriority = "user"
     priority = 100000
+    statusToBeFiltered = []
     if roles:
         for role in roles:
             collection = db['roles'] 
@@ -73,7 +74,7 @@ def generate_jwt_token(user):
                 resultPriority = roleData.get('roleName')
                 tableDisplayName = roleData.get("tableDisplayName","")
                 formDisplayName = roleData.get("formDisplayName","")
-
+            statusToBeFiltered += roleData.get("statusToBeFiltered",[])
             if roleData:
                 roleDataPermisions = roleData.get("permissions")
                 if roleDataPermisions:
@@ -92,6 +93,7 @@ def generate_jwt_token(user):
         "roles":roles ,
         "homePageRoute" : roleHomePage ,
         "tableDisplayName" : tableDisplayName ,
+        "statusToBeFiltered" : statusToBeFiltered ,
         "formDisplayName" : formDisplayName ,
         'exp': datetime.utcnow() + timedelta(days=1),  # Expiration time
         'iat': datetime.utcnow()  # Issued at time
