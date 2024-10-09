@@ -128,6 +128,12 @@ def evaluate_single_condition(condition, updated_fields):
     if field_name in updated_fields:
         print("fiels ---->" , field_name)
         print("expected --->" ,updated_fields[field_name] , expected_value)
+        if isinstance(updated_fields[field_name] , bool) :
+            print("boolean" , str(updated_fields[field_name]))
+            if str(updated_fields[field_name]) == expected_value :
+                return True
+        
+        print("expected --->" ,type(updated_fields[field_name]) , type(expected_value))
         updated_value = updated_fields[field_name]
         print("----------> ",updated_fields,updated_value == expected_value )
         # Return true if the operation is satisfied (example: 'equals', can be extended to other operations)

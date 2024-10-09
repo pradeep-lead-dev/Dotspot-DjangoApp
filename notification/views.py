@@ -186,6 +186,9 @@ def template_to_msg(message_template, id="67024d81ac773f1b89615276"):
 
 
 
+
+
+
 def get_contacts(id):
     contact_collection = db['contacts']
     role_collection = db['roles']
@@ -301,8 +304,8 @@ def calculate_weight(req):
 
         diffrence_weight = int(actual_load_weight) - int(actual_empty_weight)
         data_to_update = { 
-            "targetWeight" : diffrence_weight,
-            "actualTargetWeight":calculated_target_weight,
+            "targetWeight" : int(f'{diffrence_weight:.2f}'),
+            "actualTargetWeight":int(f'{calculated_target_weight:.2f}'),
         }
         master_collection.update_one({'_id': ObjectId(id)}, {'$set': data_to_update})
 

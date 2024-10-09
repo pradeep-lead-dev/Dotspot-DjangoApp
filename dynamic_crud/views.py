@@ -14,6 +14,7 @@ restricted_fields  = settings.SENSITIVE_COLUMN
 non_editable_fields = settings.NON_EDITABLE_COLUMN
 database_name = settings.DATABASE_NAME
 connection_string = settings.DATABASE_CONNECTION_STRING
+history_required_table = settings.HISTORY_REQUIRED_TABLE
 # Connect to a specific database
 client = MongoClient(connection_string)
 db = client[database_name] 
@@ -25,7 +26,7 @@ def convert_datetime_to_string(data):
     elif isinstance(data, list):
         return [convert_datetime_to_string(item) for item in data]
     elif isinstance(data, datetime):
-        return data.strftime('%Y-%m-%d %H:%M:%S')  # Format datetime to string
+        return data.strftime('%d-%m-%Y %H:%M:%S')  # Format datetime to string
     else:
         return data
     
@@ -51,7 +52,7 @@ def isNeeded(data):
 def getAll(req,collectionName):
     
     result = verify_and_get_payload(req)
-    
+    username = "Unknown"
     print("------------>payload" , result)
     if result.get('payload') :
         payload = result.get('payload')
@@ -62,6 +63,7 @@ def getAll(req,collectionName):
         permissions = []
     else :
         permissions = payload.get('permissions')[:]
+        username = payload.get('username',"Unknown")
 
 
     collection = db[collectionName]
@@ -99,8 +101,8 @@ def getAll(req,collectionName):
         if not permissions or str(collectionName+".create") not in permissions:
             return Response({'message': 'Permission Denied', 'success': False}, status=401)
         dataToPost = req.data
-        dataToPost["updated_at"] = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        dataToPost["created_at"] = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        dataToPost["updated_at"] = datetime.datetime.now().strftime('%d-%m-%Y %H:%M:%S')
+        dataToPost["created_at"] = datetime.datetime.now().strftime('%d-%m-%Y %H:%M:%S')
         # if "autoincrement" in dataToPost :
 
         try :
@@ -127,6 +129,12 @@ def getAll(req,collectionName):
                         dataToPost['entry_number'] = 1 
                     dataToPost[field_name] = prefix + str(dataToPost['entry_number'])
                     print(f"{prefix} --- {field_name}   --{ prefix + str(dataToPost['entry_number'])} ")
+            if collectionName in history_required_table:
+                actionName = "created"
+                statusName = "waybridgeIn"
+                created_at = datetime.datetime.now().strftime('%d-%m-%Y %H:%M:%S')
+                temp = {"actionName" : actionName , "status" : statusName , "created_at" : created_at , "username" : username}
+                dataToPost['history'] = [temp]
             data = collection.insert_one(dataToPost)
             print("\n\n post data \n ",dataToPost)
 
@@ -135,13 +143,43 @@ def getAll(req,collectionName):
             print(e)
             return Response({"message" : "Request Unsuccessful" ,"success" : False },status=400)
 
+def getSummary(data,username):
+    timestamp = datetime.datetime.now().strftime('%d-%m-%Y %H:%M:%S')
+    vehicle_number = data.get('vehicleNumber')
+    vehicle_number = data.get('vehicleNumber')
+    camera_display_name = "Cam 1"
+    if status == "weighbridgeIn":
+        summary = (f"{vehicle_number} successfully completed empty weight inspection, verified by {username} at {timestamp}.")
 
+    elif status == "awaitingLoadInputs":
+        summary = (f"The package count and customer details have been handled by {username} at {timestamp}.")
+
+    elif status == "awaitingLoading":
+        summary = (f"Loading initiation point specified at {camera_display_name}, set by {username} at {timestamp}.")
+
+    elif status == "loading":
+        summary = (f"1. Loading in progress changed from this Camera ID {previous_camera_id} to Camera ID {current_camera_id}; updated by {username} at {timestamp}.\n"
+                f"2. Loading process completed in {duration}; status will be updated by {username} at {timestamp}.")
+
+    elif status == "weighbridgeOut":
+        summary = (f"Vehicle weighed post-loading; load weight updated by {username} at {timestamp}.")
+
+    elif status == "awaitingVerification":
+        summary = (f"Load Weight and packages checked; verification status being updated by {username} at {timestamp}.")
+
+    elif status == "notVerified":
+        summary = (f"Verification failed due to a mismatch in weight and package count, noted by {username} at {timestamp}.")
+
+    elif status == "verified":
+        summary = (f"Verification successful; weight and package count confirmed by {username} at {timestamp}.")
+
+    return summary
 
 @api_view(['GET','PUT','DELETE'])
 @check
 def specificAction(request , collectionName , param):
     result = verify_and_get_payload(request)
-    
+    username = "Unknown"
     print("------------>payload" , result)
     if result.get('payload') :
         payload = result.get('payload')
@@ -152,6 +190,8 @@ def specificAction(request , collectionName , param):
         permissions = []
     else :
         permissions = payload.get('permissions')[:]
+        username = payload.get('username',"Unknown")
+
         
 
     collection = db[collectionName]
@@ -221,24 +261,54 @@ def specificAction(request , collectionName , param):
             for field in updated_data:
                 if field not in non_editable_fields:
                     filtered_data[field] = updated_data[field]  
-            filtered_data["updated_at"] = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            filtered_data["updated_at"] = datetime.datetime.now().strftime('%d-%m-%Y %H:%M:%S')
             
 
             if query_field:
                 previous_data = dict(collection.find_one({query_field : param}))
+                previous_data_befor_remove = previous_data
+
                 if previous_data :
 
                     previous_data.pop("_id")
                     if previous_data.get('previous'):
                         previous_data.pop('previous')
+                    if collectionName in history_required_table:
+                        history = previous_data.get('history',[])
+                        print("history",history)
+                        actionName = "updated"
+                        statusName = previous_data.get('status')
+                        created_at = datetime.datetime.now().strftime('%d-%m-%Y %H:%M:%S')
+                        summary = getSummary(previous_data , username)
+                        temp = {"actionName" : actionName , "status" : statusName , "created_at" : created_at , "username" : username ,"summary" : summary}
+                        
+                        history.append(temp)
+                        filtered_data['history'] = history
+                        print('history' , history)
+
+                        
                 filtered_data['previous'] = previous_data
                 result = collection.update_one({query_field: param}, {'$set': filtered_data})
             else:
                 previous_data = collection.find_one({'_id': ObjectId(param)})
+                previous_data_befor_remove = previous_data
                 if previous_data :
                     previous_data.pop("_id")
                     if previous_data.get('previous'):
                         previous_data.pop('previous')
+                    if collectionName in history_required_table:
+                        history = list(previous_data.get('history',[]))
+                        print("history",history)
+                        actionName = "updated"
+                        statusName = "waybridgeIn"
+                        created_at = datetime.datetime.now().strftime('%d-%m-%Y %H:%M:%S')
+                        summary = getSummary(previous_data , username)
+                        temp = {"actionName" : actionName , "status" : statusName , "created_at" : created_at , "username" : username ,"summary" : summary}
+                        
+                        print("history",temp)
+                        history.append(temp)
+                        filtered_data['history'] = history
+                        print('history' , history)
 
                 filtered_data['previous'] = previous_data
                 result = collection.update_one({'_id': ObjectId(param)}, {'$set': filtered_data})

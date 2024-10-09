@@ -500,36 +500,49 @@ def process_video(camera_url):
 # Start camera processing API endpoint
 @api_view(['POST'])
 def start_camera(request):
-    global camera_urls, processing_threads, processing_flags , camera_storage_ids
-    print("------------> processing flag",processing_flags)
-    camera_url = request.data.get('camera_url')
-    obj_id = request.data.get('id')
+    try :
+        global camera_urls, processing_threads, processing_flags , camera_storage_ids
+        print("------------> processing flag",processing_flags)
+        camera_url = request.data.get('camera_url')
+        obj_id = request.data.get('id')
 
-    print(obj_id , camera_url)
-    if not obj_id:
-        return Response({'error': 'No camera Storage Id provided'}, status=400)
-    if not camera_url:
-        return Response({'error': 'No camera URL provided'}, status=400)
-    camera_storage_ids[camera_url] = obj_id
+        print(obj_id , camera_url)
+        if not obj_id:
+            return Response({'error': 'No camera Storage Id provided'}, status=400)
+        if not camera_url:
+            return Response({'error': 'No camera URL provided'}, status=400)
+        camera_storage_ids[camera_url] = obj_id
 
-    if camera_url not in camera_urls:
-        return Response({'error': 'Camera Not Authorized URL provided'}, status=400)
-    master_collection = db['master'] 
-    master_data = master_collection.find_one({"_id" : ObjectId(camera_storage_ids[camera_url])})
-    previous_data = master_data.get('previous') 
-    if master_data and previous_data  :
-        if previous_data and previous_data.get("camera"):
-            previous_camera = previous_data.get("camera")
-            stop_camera_function(previous_camera)
-        # master_collection.get('previous')
-    if not processing_flags.get(camera_url, False):
-        processing_flags[camera_url] = True
-        frame_queues[camera_url] = Queue(maxsize=10)
-        processing_threads[camera_url] = threading.Thread(target=process_video, args=(camera_url,))
-        processing_threads[camera_url].start()
-        return Response({'message': f'Camera {camera_url} started processing'})
+        if camera_url not in camera_urls:
+            return Response({'error': 'Camera Not Authorized URL provided'}, status=400)
+        master_collection = db['master'] 
+        master_data = master_collection.find_one({"_id" : ObjectId(camera_storage_ids[camera_url])})
+        previous_data = master_data.get('previous') 
+        if master_data and previous_data  :
+            if previous_data and previous_data.get("camera"):
+                previous_camera = previous_data.get("camera")
+                stop_camera_function(previous_camera)
+            # master_collection.get('previous')
+        if not processing_flags.get(camera_url, False):
+            processing_flags[camera_url] = True
+            camera_collection = db["camera"] 
+            camera_collection.find_one_and_update({"cameraUrl" : camera_url} , { '$set': { "active" : True }})
+            print("-----------active changed in db")
+            frame_queues[camera_url] = Queue(maxsize=10)
+            processing_threads[camera_url] = threading.Thread(target=process_video, args=(camera_url,))
+            processing_threads[camera_url].start()
+            return Response({'message': f'Camera {camera_url} started processing'})
 
-    return Response({'message': f'Camera {camera_url} is already running'})
+        return Response({'message': f'Camera {camera_url} is already running'})
+    
+    except Exception as e :
+        if not camera_url :
+            return Response({'message': f'Camera {camera_url} started processing'})
+
+        print("Error While Starting Camera")
+        camera_collection = db["camera"] 
+        camera_collection.find_one_and_update({"cameraUrl" : camera_url} , { '$set': { "active" : False }})
+        return Response({'message': f'Camera {camera_url} not processing due to {e}'})
 
 
 # Stop camera processing API endpoint
@@ -543,6 +556,9 @@ def stop_camera(request):
 
     if processing_flags.get(camera_url, False):
         processing_flags[camera_url] = False
+        camera_collection = db["camera"] 
+        camera_collection.find_one_and_update({"cameraUrl" : camera_url} , { '$set': { "active" : False }})
+        print("--------------------active changed in db")
         # Ensure data is saved before stopping
         create_new_item_from_updates(camera_url)
         reinitialize_counter(camera_url)
@@ -556,21 +572,33 @@ def stop_camera(request):
 
 def stop_camera_function(camera_url):
     global processing_flags, processing_threads
+    try:
+        if not camera_url:
+            print({'error': 'No camera URL provided'}, status=400)
+            return 
+        if processing_flags.get(camera_url, False):
+            processing_flags[camera_url] = False
+            # Ensure data is saved before stopping
+            camera_collection = db["camera"] 
+            camera_collection.find_one_and_update({"cameraUrl" : camera_url} , { '$set': { "active" : False }})
+            print("--------------------active changed in db")
 
-    if not camera_url:
-        print({'error': 'No camera URL provided'}, status=400)
-        return 
-    if processing_flags.get(camera_url, False):
-        processing_flags[camera_url] = False
-        # Ensure data is saved before stopping
-        create_new_item_from_updates(camera_url)
-        reinitialize_counter(camera_url)
-        if processing_threads.get(camera_url):
-            processing_threads[camera_url].join()  # Wait for the thread to finish
-            print({'message': f'Camera {camera_url} stopped and data saved'})
+            create_new_item_from_updates(camera_url)
+            reinitialize_counter(camera_url)
+            if processing_threads.get(camera_url):
+                processing_threads[camera_url].join()  # Wait for the thread to finish
+                print({'message': f'Camera {camera_url} stopped and data saved'})
 
-    print({'message': f'Camera {camera_url} was not running'})
+        print({'message': f'Camera {camera_url} was not running'})
+    except Exception as e :
+        if not camera_url :
+            return
 
+        print("Error While Starting Camera")
+        camera_collection = db["camera"] 
+        camera_collection.find_one_and_update({"cameraUrl" : camera_url} , { '$set': { "active" : False }})
+
+        
 
 
 
