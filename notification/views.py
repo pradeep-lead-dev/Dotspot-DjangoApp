@@ -182,7 +182,7 @@ def template_to_msg(message_template, id="67024d81ac773f1b89615276"):
 
     print("Final Message:\n", message_template,"\n-------------------------\n")
     # Return the final formatted message
-    return message_template
+    return message_template + "\n*Dotspot Powered By Dotsito Technologies*"
 
 
 

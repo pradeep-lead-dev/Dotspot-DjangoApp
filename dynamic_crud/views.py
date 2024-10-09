@@ -131,7 +131,7 @@ def getAll(req,collectionName):
                     print(f"{prefix} --- {field_name}   --{ prefix + str(dataToPost['entry_number'])} ")
             if collectionName in history_required_table:
                 actionName = "created"
-                statusName = "waybridgeIn"
+                statusName = "weighbridgeIn"
                 created_at = datetime.datetime.now().strftime('%d-%m-%Y %H:%M:%S')
                 summary = f"{dataToPost.get('vehicleNumber')} successfully completed empty weight inspection, verified by {username} at {created_at}"
                 temp = {"actionName" : actionName , "status" : statusName , "created_at" : created_at , "username" : username , "summary" :summary}
