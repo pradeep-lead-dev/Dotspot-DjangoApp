@@ -133,7 +133,8 @@ def getAll(req,collectionName):
                 actionName = "created"
                 statusName = "waybridgeIn"
                 created_at = datetime.datetime.now().strftime('%d-%m-%Y %H:%M:%S')
-                temp = {"actionName" : actionName , "status" : statusName , "created_at" : created_at , "username" : username}
+                summary = f"{dataToPost.get('vehicleNumber')} successfully completed empty weight inspection, verified by {username} at {created_at}"
+                temp = {"actionName" : actionName , "status" : statusName , "created_at" : created_at , "username" : username , "summary" :summary}
                 dataToPost['history'] = [temp]
             data = collection.insert_one(dataToPost)
             print("\n\n post data \n ",dataToPost)
@@ -143,37 +144,83 @@ def getAll(req,collectionName):
             print(e)
             return Response({"message" : "Request Unsuccessful" ,"success" : False },status=400)
 
-def getSummary(data,username):
-    timestamp = datetime.datetime.now().strftime('%d-%m-%Y %H:%M:%S')
-    vehicle_number = data.get('vehicleNumber')
+def getSummary(data,username,statusName):
+    try :
+        timestamp = datetime.datetime.now().strftime('%d-%m-%Y %H:%M:%S')
+        vehicle_number = data.get('vehicleNumber')
+        previous = data.get('previous')
+        camera_collection = db["camera"]
+        current_cam_url = None
+        current_cam_data = None
+        previous_cam_data = None
+        previous_cam_url = None
+        
+        if previous :
+            current_cam_url = previous.get('camera')
+        if current_cam_url:
+            current_cam_data = camera_collection.find_one({"cameraUrl" : current_cam_url})
+        current_cam_name = "Conveyor"
+        if current_cam_data :
+            current_cam_name = current_cam_data.get('cameraAlias')
+        print("\n\n StatusName",statusName)
+        summary = ""
+        history = data.get('history')
+        remark = data.get('workNotes')
+        if previous:
+            previous_cam_url = previous.get('camera')
+            if previous_cam_url :
+                previous_cam_data = camera_collection.find_one({"cameraUrl" : previous_cam_url})
+            previous_cam_name = "Conveyor"
+            if previous_cam_data :
+                previous_cam_name = current_cam_data.get('cameraAlias')
 
-    camera_display_name = "Cam 1"
-    if status == "weighbridgeIn":
-        summary = (f"{vehicle_number} successfully completed empty weight inspection, verified by {username} at {timestamp}.")
+        camera_display_name = "Cam 1"
 
-    elif status == "awaitingLoadInputs":
-        summary = (f"The package count and customer details have been handled by {username} at {timestamp}.")
+        if statusName == "weighbridgeIn":
+            print("Entered In---->",statusName)
+            summary = f"{vehicle_number} successfully completed empty weight inspection, verified by {username} at {timestamp}."
 
-    elif status == "awaitingLoading":
-        summary = (f"Loading initiation point specified at {camera_display_name}, set by {username} at {timestamp}.")
+        elif statusName == "awaitingLoadInputs":
+            print("Entered In---->",statusName)
+            summary = f"The package count {data.get('targetPackage',"")} and customer details have been added by {username} at {timestamp}."
 
-    # elif status == "loading":
-    #     summary = (f"1. Loading in progress changed from this Camera ID {previous_camera_id} to Camera ID {current_camera_id}; updated by {username} at {timestamp}.\n"
-    #             f"2. Loading process completed in {duration}; status will be updated by {username} at {timestamp}.")
+        elif statusName == "awaitingLoading":
+            print("Entered In---->",statusName)
+            summary = f"Loading initiation point specified at {current_cam_name}, set by {username} at {timestamp}."
 
-    elif status == "weighbridgeOut":
-        summary = (f"Vehicle weighed post-loading; load weight updated by {username} at {timestamp}.")
+            
+        elif statusName == "loading":
+            print("Entered In---->",statusName)
+            if previous_cam_url and current_cam_url and previous_cam_url == current_cam_url :
+                summary += f"Loading process completed in {current_cam_name} updated by {username} at {timestamp}."
+            else :
+                summary = f"\nLoading in progress changed from {previous_cam_name} to  {current_cam_name}; updated by {username} at {timestamp}."
+                
+        elif statusName == "weighbridgeOut":
+            print("Entered In---->",statusName)
+            summary = f"{vehicle_number} successfully completed load weight inspection, processed by {username} at {timestamp}."
 
-    elif status == "awaitingVerification":
-        summary = (f"Load Weight and packages checked; verification status being updated by {username} at {timestamp}.")
+        elif statusName == "awaitingVerification":
+            print("Entered In---->",statusName)
+            summary = f"Load Weight and packages checked and verified by {username} at {timestamp}."
+            if remark :
+                summary += f"\nRemark : {remark}"
 
-    elif status == "notVerified":
-        summary = (f"Verification failed due to a mismatch in weight and package count, noted by {username} at {timestamp}.")
+        elif statusName == "notVerified":
+            print("Entered In---->",statusName)
+            summary = f"Verification failed due to a mismatch in weight and package count, reported by {username} at {timestamp}."
+            if remark :
+                summary += "\nRemark : remark"
 
-    elif status == "verified":
-        summary = (f"Verification successful; weight and package count confirmed by {username} at {timestamp}.")
-
+        elif statusName == "verified":
+            print("Entered In---->",statusName)
+            summary = f"Verification successful; weight and package count  confirmed by {username} at {timestamp}."
+            if remark :
+                summary += "\nRemark : remark"
+    except Exception as e :
+        print("Error -->",e)
     return summary
+
 
 @api_view(['GET','PUT','DELETE'])
 @check
@@ -261,58 +308,53 @@ def specificAction(request , collectionName , param):
             for field in updated_data:
                 if field not in non_editable_fields:
                     filtered_data[field] = updated_data[field]  
-            filtered_data["updated_at"] = datetime.datetime.now().strftime('%d-%m-%Y %H:%M:%S')
+            filtered_data["updated_at"] = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             
 
             if query_field:
                 previous_data = dict(collection.find_one({query_field : param}))
-                previous_data_befor_remove = previous_data
-
                 if previous_data :
 
                     previous_data.pop("_id")
                     if previous_data.get('previous'):
                         previous_data.pop('previous')
-                    if collectionName in history_required_table:
-                        history = previous_data.get('history',[])
-                        print("history",history)
-                        actionName = "updated"
-                        statusName = previous_data.get('status')
-                        created_at = datetime.datetime.now().strftime('%d-%m-%Y %H:%M:%S')
-                        summary = getSummary(previous_data , username)
-                        temp = {"actionName" : actionName , "status" : statusName , "created_at" : created_at , "username" : username ,"summary" : summary}
-                        
-                        history.append(temp)
-                        filtered_data['history'] = history
-                        print('history' , history)
-
-                        
                 filtered_data['previous'] = previous_data
                 result = collection.update_one({query_field: param}, {'$set': filtered_data})
             else:
                 previous_data = collection.find_one({'_id': ObjectId(param)})
-                previous_data_befor_remove = previous_data
                 if previous_data :
                     previous_data.pop("_id")
                     if previous_data.get('previous'):
                         previous_data.pop('previous')
-                    if collectionName in history_required_table:
-                        history = list(previous_data.get('history',[]))
-                        print("history",history)
-                        actionName = "updated"
-                        statusName = "waybridgeIn"
-                        created_at = datetime.datetime.now().strftime('%d-%m-%Y %H:%M:%S')
-                        summary = getSummary(previous_data , username)
-                        temp = {"actionName" : actionName , "status" : statusName , "created_at" : created_at , "username" : username ,"summary" : summary}
-                        
-                        print("history",temp)
-                        history.append(temp)
-                        filtered_data['history'] = history
-                        print('history' , history)
 
                 filtered_data['previous'] = previous_data
                 result = collection.update_one({'_id': ObjectId(param)}, {'$set': filtered_data})
+
+
             if result.matched_count:
+                data_after_mod = collection.find_one({'_id': ObjectId(param)})
+                print("Enter the History")
+                for i in data_after_mod:
+                    print("ddd",data_after_mod[i])
+                try :
+                    if collectionName in history_required_table:
+                        filtered_data = {}
+                        history = data_after_mod.get('history',[])
+                        print("history",history)
+                        actionName = "updated"
+                        statusName = previous_data.get('status')
+                        created_at = datetime.datetime.now().strftime('%d-%m-%Y %H:%M:%S')
+                        summary = getSummary(data_after_mod , username ,statusName)
+                        temp = {"actionName" : actionName , "status" : statusName , "created_at" : created_at , "username" : username ,"summary" : summary}
+                        
+                        history.append(temp)
+                        filtered_data['history'] = history
+                        collection.update_one({'_id': ObjectId(param)}, {'$set': filtered_data})
+                        print('history' , history)
+                except Exception as e :
+                    print("Error---->" , e)
+                    
+
                 return Response({'success': True, 'message': f'{str(collectionName).capitalize()} updated'}, status=status.HTTP_200_OK)
             else:
                 return Response({'success': False, 'message': f'{str(collectionName).capitalize()} not found'}, status=status.HTTP_404_NOT_FOUND)

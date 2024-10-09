@@ -202,4 +202,4 @@ EMAIL_HOST_PASSWORD = 'rggscuaxizlzakuk'  # Replace with your email password
 
 BY_PASS_TOKEN = "0bf57cae-a4b7-41eb-9a91-75afec80ab95"
  
-HISTORY_REQUIRED_TABLE = ['test']
+HISTORY_REQUIRED_TABLE = ['test' , 'master']

@@ -172,7 +172,7 @@ def template_to_msg(message_template, id="67024d81ac773f1b89615276"):
                     )
                     replace_text[txt] = formatted_list if formatted_list else "N/A"
             else:
-                replace_text[txt] = value+"\n" if value is not None else "N/A"  # Set to "N/A" if None
+                replace_text[txt] = str(value)+"\n" if value is not None else "N/A"  # Set to "N/A" if None
         else:
             replace_text[txt] = "N/A"  # Set to "N/A" if the document is not found
 
@@ -302,10 +302,10 @@ def calculate_weight(req):
             print(packageName,actualCount,targetCount , "weight = ",object_dict.get(packageName).get('weight') )
         print("---------->",calculated_target_weight,target_weight)
 
-        diffrence_weight = int(actual_load_weight) - int(actual_empty_weight)
+        diffrence_weight = float(actual_load_weight) - float(actual_empty_weight)
         data_to_update = { 
-            "targetWeight" : int(f'{diffrence_weight:.2f}'),
-            "actualTargetWeight":int(f'{calculated_target_weight:.2f}'),
+            "targetWeight" : float(f'{diffrence_weight:.2f}'),
+            "actualTargetWeight":float(f'{calculated_target_weight:.2f}'),
         }
         master_collection.update_one({'_id': ObjectId(id)}, {'$set': data_to_update})
 
