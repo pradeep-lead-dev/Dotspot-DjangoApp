@@ -146,7 +146,7 @@ def getAll(req,collectionName):
 def getSummary(data,username):
     timestamp = datetime.datetime.now().strftime('%d-%m-%Y %H:%M:%S')
     vehicle_number = data.get('vehicleNumber')
-    vehicle_number = data.get('vehicleNumber')
+
     camera_display_name = "Cam 1"
     if status == "weighbridgeIn":
         summary = (f"{vehicle_number} successfully completed empty weight inspection, verified by {username} at {timestamp}.")
@@ -157,9 +157,9 @@ def getSummary(data,username):
     elif status == "awaitingLoading":
         summary = (f"Loading initiation point specified at {camera_display_name}, set by {username} at {timestamp}.")
 
-    elif status == "loading":
-        summary = (f"1. Loading in progress changed from this Camera ID {previous_camera_id} to Camera ID {current_camera_id}; updated by {username} at {timestamp}.\n"
-                f"2. Loading process completed in {duration}; status will be updated by {username} at {timestamp}.")
+    # elif status == "loading":
+    #     summary = (f"1. Loading in progress changed from this Camera ID {previous_camera_id} to Camera ID {current_camera_id}; updated by {username} at {timestamp}.\n"
+    #             f"2. Loading process completed in {duration}; status will be updated by {username} at {timestamp}.")
 
     elif status == "weighbridgeOut":
         summary = (f"Vehicle weighed post-loading; load weight updated by {username} at {timestamp}.")
