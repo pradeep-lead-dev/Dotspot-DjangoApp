@@ -210,13 +210,13 @@ def getSummary(data,username,statusName):
             print("Entered In---->",statusName)
             summary = f"Verification failed due to a mismatch in weight and package count, reported by {username} at {timestamp}."
             if remark :
-                summary += "\nRemark : remark"
+                summary += f"\nRemark : {remark}"
 
         elif statusName == "verified":
             print("Entered In---->",statusName)
             summary = f"Verification successful; weight and package count  confirmed by {username} at {timestamp}."
             if remark :
-                summary += "\nRemark : remark"
+                summary += f"\nRemark : {remark}"
     except Exception as e :
         print("Error -->",e)
     return summary

@@ -528,6 +528,7 @@ def start_camera(request):
             camera_collection = db["camera"] 
             camera_collection.find_one_and_update({"cameraUrl" : camera_url} , { '$set': { "active" : True }})
             print("-----------active changed in db")
+            reinitialize_counter(camera_url)
             frame_queues[camera_url] = Queue(maxsize=10)
             processing_threads[camera_url] = threading.Thread(target=process_video, args=(camera_url,))
             processing_threads[camera_url].start()
@@ -539,7 +540,7 @@ def start_camera(request):
         if not camera_url :
             return Response({'message': f'Camera {camera_url} started processing'})
 
-        print("Error While Starting Camera")
+        print("Error While Starting Camera" ,  e)
         camera_collection = db["camera"] 
         camera_collection.find_one_and_update({"cameraUrl" : camera_url} , { '$set': { "active" : False }})
         return Response({'message': f'Camera {camera_url} not processing due to {e}'})
@@ -565,6 +566,7 @@ def stop_camera(request):
         if processing_threads.get(camera_url):
             processing_threads[camera_url].join()  # Wait for the thread to finish
             return Response({'message': f'Camera {camera_url} stopped and data saved'})
+    
 
     return Response({'message': f'Camera {camera_url} was not running'})
 
@@ -572,7 +574,10 @@ def stop_camera(request):
 
 def stop_camera_function(camera_url):
     global processing_flags, processing_threads
+    print("cameraurl", camera_url)
     try:
+        print("cameraurl", camera_url)
+
         if not camera_url:
             print({'error': 'No camera URL provided'}, status=400)
             return 
@@ -594,7 +599,8 @@ def stop_camera_function(camera_url):
         if not camera_url :
             return
 
-        print("Error While Starting Camera")
+        print("Error While Starting Camera" , str(e))
+
         camera_collection = db["camera"] 
         camera_collection.find_one_and_update({"cameraUrl" : camera_url} , { '$set': { "active" : False }})
 

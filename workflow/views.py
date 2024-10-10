@@ -234,26 +234,20 @@ def start_camera(action, updated_fields,document_id,stop=False):
     except Exception as e:
         print(f"Error while starting camera: {e}")
 
-def json_serial(obj):
-    """JSON serializer for objects not serializable by default."""
+def custom_serializer(obj):
+    """Custom serializer to handle non-JSON serializable types."""
     if isinstance(obj, datetime):
-        return obj.isoformat()  # Convert datetime to string in ISO format
+        return obj.isoformat()
     raise TypeError(f"Type {type(obj)} not serializable")
 
-
 def sanitize_body_string(body_str):
-    # Replace control characters (if any) that are not allowed in JSON
-    # For example, replace unescaped newline or tab characters
-    sanitized_str = re.sub(r'[\x00-\x09\x0B-\x1F\x7F]', '', body_str)
-
-    # sanitized_str = re.sub(r'[\x00-\x1F\x7F]', '', body_str)  # Remove control characters
-    return sanitized_str
-
+    """Sanitize body string if needed (implement as necessary)."""
+    # Example: Add escape sequences for special characters
+    return body_str
 
 def trigger_webhook(action, updated_fields, current_collection_name, document_id):
     try:
         webhook_url = action.get('url')
-
         headers = action.get('headers', {})
         
         # Ensure headers is a dictionary
@@ -288,12 +282,10 @@ def trigger_webhook(action, updated_fields, current_collection_name, document_id
         body["tableName"] = current_collection_name
 
         # Convert datetime objects to ISO format (yyyy-mm-ddThh:mm:ss)
-        for key, value in updated_fields.items():
-            if isinstance(value, datetime):
-                updated_fields[key] = value.isoformat()
+        serialized_updated_fields = json.loads(json.dumps(updated_fields, default=custom_serializer))
 
         # Add updated fields to the body
-        body.update(updated_fields)
+        body.update(serialized_updated_fields)
 
         print("\nbody\n", body)
         print(f"Triggering webhook: {webhook_url} with headers: {headers} and body: {body}")
@@ -312,8 +304,6 @@ def trigger_webhook(action, updated_fields, current_collection_name, document_id
 
     except Exception as e:
         print(f"Error while triggering webhook: {e}")
-        
-
 def start_watching():
     """
     Start a new thread to watch MongoDB in the background.

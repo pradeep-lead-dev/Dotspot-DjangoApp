@@ -182,7 +182,7 @@ def template_to_msg(message_template, id="67024d81ac773f1b89615276"):
 
     print("Final Message:\n", message_template,"\n-------------------------\n")
     # Return the final formatted message
-    return message_template + "\n*Dotspot Powered By Dotsito Technologies*"
+    return message_template + "\n\n-`Dotspot Powered By Dotsito Technologies`"
 
 
 
@@ -321,6 +321,7 @@ def calculate_weight(req):
 
 @api_view(['POST'])
 def change_camera_details(req):
+    print("\n triggered details"*15,req.data)
     print("req body ---------->",req.data)
     camera_url = req.data.get('camera')
     id = req.data.get('id')
